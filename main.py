@@ -178,9 +178,23 @@ def main():
                     screen_cv, region, last_raid_state, last_join_time, raid_joined_at_least_once, window
                 )
 
-                # Если присоединились к рейду — обновляем таймер, чтобы продолжать участвовать
-                if raid_joined_at_least_once:
-                    raid_start_time = time.time()
+                # Если все рейды завершены — возвращаемся к лечению
+                if last_raid_state == RaidState.RAID_COMPLETED:
+                    print("[MAIN] Рейды завершены, возврат к лечению")
+                    current_mode = MainMode.HEAL
+                    last_raid_state = None
+                    raid_start_time = None
+                    raid_joined_at_least_once = False
+                    continue
+
+                # Если рейдов больше нет — тоже возвращаемся
+                if last_raid_state == RaidState.NO_REIDS:
+                    print("[MAIN] Рейды отсутствуют, возврат к лечению")
+                    current_mode = MainMode.HEAL
+                    last_raid_state = None
+                    raid_start_time = None
+                    raid_joined_at_least_once = False
+                    continue
 
             time.sleep(1)
 

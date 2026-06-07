@@ -234,21 +234,21 @@ def process_raid(screen_cv, region, last_raid_state, last_join_time, raid_joined
 
     if current_state == RaidState.NO_FREE_SPACE:
         find_and_click(RAID_OK_IMG, screen_cv, region)
-        return last_raid_state, time.time(), True
+        return last_raid_state, time.time(), raid_joined_at_least_once
 
     if current_state == RaidState.NO_REIDS:
         village_coords, _ = find_on_screen(get_template(VILLAGE_IMG), screen_cv, region)
         if village_coords:
             navigate_to_reid_window()
             return None, last_join_time, raid_joined_at_least_once
-        return last_raid_state, time.time(), True
+        return last_raid_state, time.time(), raid_joined_at_least_once
 
     if current_state == RaidState.NEEDS_SCROLL:
         check_and_scroll_for_attack(screen_cv, region)
-        return RaidState.RAID_IN_PROGRESS, time.time(), True
+        return RaidState.RAID_IN_PROGRESS, time.time(), raid_joined_at_least_once
 
     if current_state == RaidState.RAID_IN_PROGRESS:
-        return current_state, time.time(), True
+        return current_state, time.time(), raid_joined_at_least_once
 
     if current_state == RaidState.PLUS_VISIBLE:
         found, _ = find_and_click(RAID_PLUS_IMG, screen_cv, region)
