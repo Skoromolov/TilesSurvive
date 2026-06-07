@@ -192,6 +192,8 @@ def determine_raid_state(screen_cv, region):
     if attack_count > 0:
         return RaidState.RAID_IN_PROGRESS
     else:
+        if not reid_active_found and not reid_not_active_found:
+            return RaidState.NAVIGATION_NEEDED
         if plus_found:
             return RaidState.NO_REIDS
         else:

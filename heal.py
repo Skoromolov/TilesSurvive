@@ -119,6 +119,11 @@ def process_heal(screen_cv, region, last_heal_state):
             return HealState.UNKNOWN
 
     if current_state == HealState.HEAL_MENU_OPEN:
+        # Попытка найти и нажать кнопку бесплатного лечения, если доступна
+        found, _ = find_and_click(HEAL_FREE_BUTTON_IMG, screen_cv, region)
+        if found:
+            return HealState.MAIN_SCREEN
+        # Если бесплатное лечение недоступно, используем обычное лечение
         found, _ = find_and_click(HEAL_BUTTON_IMG, screen_cv, region)
         if found:
             return HealState.MAIN_SCREEN
@@ -133,6 +138,38 @@ def process_heal(screen_cv, region, last_heal_state):
         found, _ = find_and_click(CLOSE_IMG, screen_cv, region)
         if found:
             return HealState.UNKNOWN
+
+    # Защита от перехода в режим редактирования поселения
+    # Если мы не нашли ни одной из ключевых иконок игры, вероятно мы в режиме редактирования
+    # Нужно кликнуть по безопасной области (верхней части экрана) чтобы выйти из этого режима
+    key_icons_found = False
+    # Проверяем наличие ключевых иконок, которые должны быть видимы в нормальном режиме игры
+    key_templates = [
+        WILD_EARTH_IMG,    # Дикие земли - указывает на главный экран
+        EVENTS_IMG,        # События
+        HELP_HANDS_IMG,    # Помощь союзу
+        SOUZ_IMG,          # Союз (альтернативная иконка)
+        HEAL_TOWN_IMG,     # Иконка лечения
+        MAIL_IMG,          # Почта
+    ]
+    
+    for template_path in key_templates:
+        template = get_template(template_path)
+        if template is not None:
+            coords, conf = find_on_screen(template, screen_cv, region, CONFIDENCE_THRESHOLD)
+            if coords and conf >= CONFIDENCE_THRESHOLD:
+                key_icons_found = True
+                break
+    
+    if not key_icons_found:
+        print("[HEAL] ⚠️ Не найдены ключевые иконки игры - возможен переход в режим редактирования поселения")
+        print("[HEAL] Выполняем клик по верхней части экрана для выхода из режима редактирования")
+        # Клик по верхней центральной части экрана (безопасная зона)
+        click_x = region[0] + region[2] // 2  # Центр по X
+        click_y = region[1] + int(region[3] * 0.15)  # 15% от высоты от верхней границы
+        pyautogui.click(click_x, click_y)
+        time.sleep(1)  # Небольшая пауза после клика
+        return None
 
     return HealState.UNKNOWN
 

@@ -76,8 +76,9 @@ def main():
             if FORCE_RAID_ONLY and not FORCE_HEAL_ONLY:
                 current_raid_state = determine_raid_state(screen_cv, region)
                 print(f"[MAIN] Принудительный режим RAID: {current_raid_state.value}")
-                process_raid(screen_cv, region, last_raid_state, last_join_time, raid_joined_at_least_once, window)
-                last_raid_state = current_raid_state
+                last_raid_state, last_join_time, raid_joined_at_least_once = process_raid(
+                    screen_cv, region, last_raid_state, last_join_time, raid_joined_at_least_once, window
+                )
                 continue
 
             # Режим HEAL
@@ -149,6 +150,37 @@ def main():
                     last_gold_state = None
                     gold_start_time = None
                     continue
+
+            # Режим RAID
+            elif current_mode == MainMode.RAID:
+                # Защитный таймаут: если не удалось присоединиться за RAID_JOIN_TIMEOUT — возвращаемся к лечению
+                if raid_start_time and (time.time() - raid_start_time) >= RAID_JOIN_TIMEOUT:
+                    if not raid_joined_at_least_once:
+                        print(f"[ТАЙМЕР] Не удалось присоединиться к рейду за {RAID_JOIN_TIMEOUT} сек. Возвращаемся к лечению.")
+                        current_mode = MainMode.HEAL
+                        last_raid_state = None
+                        raid_start_time = None
+                        raid_joined_at_least_once = False
+                        continue
+
+                # Если ещё стартуем и не определён state
+                if last_raid_state is None:
+                    current_raid_state = determine_raid_state(screen_cv, region)
+                    print(f"[MAIN] RAID: стартовое состояние {current_raid_state.value}")
+                    last_raid_state = current_raid_state
+
+                # Обработать одно состояние
+                current_raid_state = determine_raid_state(screen_cv, region)
+                if current_raid_state != last_raid_state:
+                    print(f"[MAIN] RAID: {current_raid_state.value}")
+
+                last_raid_state, last_join_time, raid_joined_at_least_once = process_raid(
+                    screen_cv, region, last_raid_state, last_join_time, raid_joined_at_least_once, window
+                )
+
+                # Если присоединились к рейду — обновляем таймер, чтобы продолжать участвовать
+                if raid_joined_at_least_once:
+                    raid_start_time = time.time()
 
             time.sleep(1)
 
