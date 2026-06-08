@@ -163,6 +163,10 @@ def determine_raid_state(screen_cv, region):
     if coords:
         return RaidState.RECONNECT_REPEAT_POPUP
 
+    # coords, _ = find_on_screen(get_template(RAID_FULL_IMG), screen_cv, region)
+    # if coords:
+    #     return RaidState.RAID_FULL
+
     coords, _ = find_on_screen(get_template(RAID_NO_FREE_SPACE_IMG), screen_cv, region)
     if coords:
         return RaidState.NO_FREE_SPACE
@@ -236,6 +240,11 @@ def process_raid(screen_cv, region, last_raid_state, last_join_time, raid_joined
         find_and_click(RAID_OK_IMG, screen_cv, region)
         return last_raid_state, time.time(), raid_joined_at_least_once
 
+    if current_state == RaidState.RAID_FULL:
+        find_and_click(RAID_OK_IMG, screen_cv, region)
+        # После закрытия окна считаем, что мест нет
+        return RaidState.NO_FREE_SPACE, time.time(), raid_joined_at_least_once
+
     if current_state == RaidState.NO_REIDS:
         village_coords, _ = find_on_screen(get_template(VILLAGE_IMG), screen_cv, region)
         if village_coords:
@@ -275,6 +284,15 @@ def process_raid(screen_cv, region, last_raid_state, last_join_time, raid_joined
         if found2:
             time.sleep(0.5)
             screen_cv = take_screenshot(window, region)
+            
+            # Check for OK button immediately after marching (e.g., "raid full" confirmation)
+            ok_found, _ = find_and_click(RAID_OK_IMG, screen_cv, region)
+            if ok_found:
+                time.sleep(0.5)
+                screen_cv = take_screenshot(window, region)
+                return RaidState.NO_FREE_SPACE, time.time(), True
+            
+            # Original logic: check for "no free space" popup
             no_space_found, _ = find_and_click(RAID_NO_FREE_SPACE_IMG, screen_cv, region)
             if no_space_found:
                 time.sleep(0.5)
