@@ -163,9 +163,9 @@ def determine_raid_state(screen_cv, region):
     if coords:
         return RaidState.RECONNECT_REPEAT_POPUP
 
-    # coords, _ = find_on_screen(get_template(RAID_FULL_IMG), screen_cv, region)
-    # if coords:
-    #     return RaidState.RAID_FULL
+    coords, _ = find_on_screen(get_template(RAID_FULL_IMG), screen_cv, region)
+    if coords:
+        return RaidState.RAID_FULL
 
     coords, _ = find_on_screen(get_template(RAID_NO_FREE_SPACE_IMG), screen_cv, region)
     if coords:
