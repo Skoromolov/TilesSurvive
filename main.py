@@ -200,7 +200,7 @@ def main():
 
         except Exception as e:
             print(f"[ОШИБКА] {e}")
-            time.sleep(5)
+            time.sleep(10)
 
 
 # ==========================================

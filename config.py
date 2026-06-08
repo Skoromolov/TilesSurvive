@@ -85,6 +85,7 @@ CONFIDENCE_THRESHOLD = 0.70
 CONFIDENCE_HIGH = 0.95
 MARCH_THRESHOLD = 0.90
 NAVIGATION_THRESHOLD = 0.90
+CONFIDENCE_MEDIUM_THRESHOLD = 0.80
 
 # ==========================================
 # ПАРАМЕТРЫ РЕЙДОВ

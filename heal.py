@@ -27,39 +27,39 @@ def determine_heal_state(screen_cv, region):
     if coords:
         return HealState.FAST_USE_POPUP
 
-    coords, _ = find_on_screen(get_template(HEAL_BUTTON_IMG), screen_cv, region)
+    coords, _ = find_on_screen(get_template(HEAL_BUTTON_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if coords:
         return HealState.HEAL_MENU_OPEN
 
-    coords, _ = find_on_screen(get_template(CONFIRM_BUTTON_IMG), screen_cv, region)
+    coords, _ = find_on_screen(get_template(CONFIRM_BUTTON_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if coords:
         return HealState.CONFIRM_BUTTON_REQUIRED
 
-    coords, _ = find_on_screen(get_template(MAIL_IMG), screen_cv, region)
+    coords, _ = find_on_screen(get_template(MAIL_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if coords:
         return HealState.MAIL
 
-    coords, _ = find_on_screen(get_template(HEAL_TOWN_IMG), screen_cv, region)
+    coords, _ = find_on_screen(get_template(HEAL_TOWN_IMG), screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
     if coords:
         return HealState.HEAL_ICON
 
-    coords, _ = find_on_screen(get_template(HELP_HANDS_IMG), screen_cv, region)
+    coords, _ = find_on_screen(get_template(HELP_HANDS_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if coords:
         return HealState.HELP_HANDS
 
-    coords, _ = find_on_screen(get_template(HEAL_HELP_HANDS_IMG), screen_cv, region)
+    coords, _ = find_on_screen(get_template(HEAL_HELP_HANDS_IMG), screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
     if coords:
         return HealState.HEAL_HELP
 
-    coords, _ = find_on_screen(get_template(HEAL_WAIT_IMG), screen_cv, region)
+    coords, _ = find_on_screen(get_template(HEAL_WAIT_IMG), screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
     if coords:
         return HealState.HEAL_WAIT
 
-    coords, _ = find_on_screen(get_template(WILD_EARTH_IMG), screen_cv, region)
+    coords, _ = find_on_screen(get_template(WILD_EARTH_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if coords:
         return HealState.MAIN_SCREEN
 
-    coords, _ = find_on_screen(get_template(VILLAGE_IMG), screen_cv, region)
+    coords, _ = find_on_screen(get_template(VILLAGE_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if coords:
         return HealState.UNKNOWN
 
@@ -97,18 +97,18 @@ def process_heal(screen_cv, region, last_heal_state):
         return None
 
     if current_state == HealState.HEAL_ICON:
-        found, _ = find_and_click(HEAL_TOWN_IMG, screen_cv, region)
+        found, _ = find_and_click(HEAL_TOWN_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
         if found:
             return HealState.HEAL_MENU_OPEN
         return None
 
     if current_state == HealState.HEAL_HELP:
-        found, _ = find_and_click(HEAL_HELP_HANDS_IMG, screen_cv, region)
+        found, _ = find_and_click(HEAL_HELP_HANDS_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
         if found:
             return None
 
     if current_state == HealState.HEAL_ACTIVE:
-        found, _ = find_and_click(HEAL_HELP_HANDS_IMG, screen_cv, region)
+        found, _ = find_and_click(HEAL_HELP_HANDS_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
         if found:
             return None
         return HealState.HEAL_ACTIVE
