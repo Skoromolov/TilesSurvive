@@ -313,14 +313,14 @@ def check_for_raid_button(screen_cv, region):
     Возвращает: True если найдена и нажата
     """
     # Проверка первой кнопки
-    found, conf = find_on_screen(get_template(RAID_HAVE_TO_CONNECT_IMG), screen_cv, region, threshold=0.5)
+    found, conf = find_on_screen(get_template(RAID_HAVE_TO_CONNECT_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if found:
         print(f"[RAID] Найден рейд (HAVE_TO_CONNECT_IMG, conf={conf:.3f})")
         find_and_click(RAID_HAVE_TO_CONNECT_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)
         return True
 
     # Проверка второй кнопки
-    found, conf = find_on_screen(get_template(RAID_HAVE_TO_CONNECT_2_IMG), screen_cv, region, threshold=0.5)
+    found, conf = find_on_screen(get_template(RAID_HAVE_TO_CONNECT_2_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if found:
         print(f"[RAID] Найден рейд (HAVE_TO_CONNECT_2_IMG, conf={conf:.3f})")
         find_and_click(RAID_HAVE_TO_CONNECT_2_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)
