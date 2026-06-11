@@ -27,7 +27,7 @@ def determine_heal_state(screen_cv, region):
     if coords:
         return HealState.FAST_USE_POPUP
 
-    coords, _ = find_on_screen(get_template(HEAL_BUTTON_IMG), screen_cv, region, threshold=NAVIGATION_THRESHOLD)
+    coords, _ = find_on_screen(get_template(HEAL_BUTTON_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if coords:
         return HealState.HEAL_MENU_OPEN
 
@@ -78,10 +78,11 @@ def process_heal(screen_cv, region, last_heal_state):
     Обработать текущее состояние лечения.
     Возвращает: новое состояние (HealState или None)
     """
+    # print(f"[HEAL] Состояние до обработки: {last_heal_state}")
     current_state = determine_heal_state(screen_cv, region)
 
-    if current_state != last_heal_state:
-        print(f"[HEAL] Состояние: {current_state.value}")
+    # if current_state != last_heal_state:
+        # print(f"[HEAL] Состояние: {current_state.value}")
 
     # Обработка каждого состояния
     if current_state == HealState.RECONNECT_POPUP:
@@ -131,21 +132,21 @@ def process_heal(screen_cv, region, last_heal_state):
 
     if current_state == HealState.HEAL_MENU_OPEN:
         # Попытка найти и нажать кнопку бесплатного лечения, если доступна
-            try:
-                found, _ = find_and_click(HEAL_FREE_BUTTON_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)
-            except Exception as e:
-                print(f"[HEAL] Error in HEAL_MENU_OPEN (free button): {e}")
-                found = False
-            if found:
-                return HealState.MAIN_SCREEN
+        #     try:
+        found, _ = find_and_click(HEAL_FREE_BUTTON_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)
+        # except Exception as e:
+        #     print(f"[HEAL] Error in HEAL_MENU_OPEN (free button): {e}")
+        #     found = False
+        if found:
+            return HealState.MAIN_SCREEN
         # Если бесплатное лечение недоступно, используем обычное лечение
-            try:
-                found, _ = find_and_click(HEAL_BUTTON_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)
-            except Exception as e:
-                print(f"[HEAL] Error in HEAL_MENU_OPEN (heal button): {e}")
-                found = False
-            if found:
-                return HealState.MAIN_SCREEN
+        #     try:
+        found, _ = find_and_click(HEAL_BUTTON_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)
+            # except Exception as e:
+            #     print(f"[HEAL] Error in HEAL_MENU_OPEN (heal button): {e}")
+            #     found = False
+        if found:
+            return HealState.MAIN_SCREEN
     if current_state == HealState.FAST_USE_POPUP:
         try:
             found, _ = find_and_click(CLOSE_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
@@ -154,7 +155,6 @@ def process_heal(screen_cv, region, last_heal_state):
             found = False
         if found:
             return HealState.UNKNOWN
-
 
     if current_state == HealState.UNKNOWN:
         try:
