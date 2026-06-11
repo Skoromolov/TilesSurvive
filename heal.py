@@ -27,7 +27,11 @@ def determine_heal_state(screen_cv, region):
     if coords:
         return HealState.FAST_USE_POPUP
 
-    coords, _ = find_on_screen(get_template(HEAL_BUTTON_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+    coords, _ = find_on_screen(get_template(HEAL_BUTTON_IMG), screen_cv, region, threshold=NAVIGATION_THRESHOLD)
+    if coords:
+        return HealState.HEAL_MENU_OPEN
+
+    coords, _ = find_on_screen(get_template(HEAL_FREE_BUTTON_IMG), screen_cv, region, threshold=NAVIGATION_THRESHOLD)
     if coords:
         return HealState.HEAL_MENU_OPEN
 
