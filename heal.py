@@ -23,7 +23,7 @@ def determine_heal_state(screen_cv, region):
     if coords:
         return HealState.RECONNECT_REPEAT_POPUP
 
-    coords, _ = find_on_screen(get_template(FAST_USE_IMG), screen_cv, region)
+    coords, _ = find_on_screen(get_template(FAST_USE_IMG), screen_cv, region,threshold=CONFIDENCE_THRESHOLD)
     if coords:
         return HealState.FAST_USE_POPUP
 
@@ -89,53 +89,89 @@ def process_heal(screen_cv, region, last_heal_state):
         return None
 
     if current_state == HealState.MAIL:
-        find_and_click(MAIL_IMG, screen_cv, region)
+        find_and_click(MAIL_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)
         return None
 
     if current_state == HealState.CONFIRM_BUTTON_REQUIRED:
-        find_and_click(CONFIRM_BUTTON_IMG, screen_cv, region)
+        find_and_click(CONFIRM_BUTTON_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)
         return None
 
     if current_state == HealState.HEAL_ICON:
-        found, _ = find_and_click(HEAL_TOWN_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        try:
+            found, _ = find_and_click(HEAL_TOWN_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        except Exception as e:
+            print(f"[HEAL] Error in HEAL_ICON: {e}")
+            found = False
         if found:
             return HealState.HEAL_MENU_OPEN
         return None
 
     if current_state == HealState.HEAL_HELP:
-        found, _ = find_and_click(HEAL_HELP_HANDS_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        try:
+            found, _ = find_and_click(HEAL_HELP_HANDS_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        except Exception as e:
+            print(f"[HEAL] Error in HEAL_HELP: {e}")
+            found = False
         if found:
             return None
 
     if current_state == HealState.HEAL_ACTIVE:
-        found, _ = find_and_click(HEAL_HELP_HANDS_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        try:
+            found, _ = find_and_click(HEAL_HELP_HANDS_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        except Exception as e:
+            print(f"[HEAL] Error in HEAL_ACTIVE: {e}")
+            found = False
         if found:
             return None
         return HealState.HEAL_ACTIVE
 
-    if current_state == HealState.FAST_USE_POPUP:
-        found, _ = find_and_click(CLOSE_IMG, screen_cv, region)
-        if found:
-            return HealState.UNKNOWN
-
     if current_state == HealState.HEAL_MENU_OPEN:
         # Попытка найти и нажать кнопку бесплатного лечения, если доступна
-        found, _ = find_and_click(HEAL_FREE_BUTTON_IMG, screen_cv, region)
-        if found:
-            return HealState.MAIN_SCREEN
+            try:
+                found, _ = find_and_click(HEAL_FREE_BUTTON_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)
+            except Exception as e:
+                print(f"[HEAL] Error in HEAL_MENU_OPEN (free button): {e}")
+                found = False
+            if found:
+                return HealState.MAIN_SCREEN
         # Если бесплатное лечение недоступно, используем обычное лечение
-        found, _ = find_and_click(HEAL_BUTTON_IMG, screen_cv, region)
-        if found:
-            return HealState.MAIN_SCREEN
-
-    if current_state == HealState.UNKNOWN:
-        found, _ = find_and_click(VILLAGE_IMG, screen_cv, region)
-        if found:
-            return HealState.MAIN_SCREEN
-        found, _ = find_and_click(BACK_IMG, screen_cv, region)
+            try:
+                found, _ = find_and_click(HEAL_BUTTON_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)
+            except Exception as e:
+                print(f"[HEAL] Error in HEAL_MENU_OPEN (heal button): {e}")
+                found = False
+            if found:
+                return HealState.MAIN_SCREEN
+    if current_state == HealState.FAST_USE_POPUP:
+        try:
+            found, _ = find_and_click(CLOSE_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        except Exception as e:
+            print(f"[HEAL] Error in FAST_USE_POPUP: {e}")
+            found = False
         if found:
             return HealState.UNKNOWN
-        found, _ = find_and_click(CLOSE_IMG, screen_cv, region)
+
+
+    if current_state == HealState.UNKNOWN:
+        try:
+            found, _ = find_and_click(VILLAGE_IMG, screen_cv, region)
+        except Exception as e:
+            print(f"[HEAL] Error in UNKNOWN block (VILLAGE_IMG): {e}")
+            found = False
+        if found:
+            return HealState.MAIN_SCREEN
+        try:
+            found, _ = find_and_click(BACK_IMG, screen_cv, region)
+        except Exception as e:
+            print(f"[HEAL] Error in UNKNOWN block (BACK_IMG): {e}")
+            found = False
+        if found:
+            return HealState.UNKNOWN
+        try:
+            found, _ = find_and_click(CLOSE_IMG, screen_cv, region)
+        except Exception as e:
+            print(f"[HEAL] Error in UNKNOWN block (CLOSE_IMG): {e}")
+            found = False
         if found:
             return HealState.UNKNOWN
 
@@ -182,7 +218,11 @@ def check_and_click_help_button(screen_cv, region):
     Проверить и кликнуть кнопку помощи союзу.
     Возвращает: True если найдена и нажата
     """
-    found, _ = find_and_click(HELP_HANDS_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)
+    found = False
+    try:
+        found, _ = find_and_click(HELP_HANDS_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)
+    except Exception as e:
+        print(f"[HEAL] Error in check_and_click_help_button: {e}")
     if found:
         print("[HEAL] ✓ Кнопка помощи найдена и нажата!")
     return found
