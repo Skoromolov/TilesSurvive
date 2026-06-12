@@ -22,6 +22,14 @@ FORCE_HEAL_ONLY = False   # True = только лечение, False = авто
 FORCE_RAID_ONLY = False   # True = только рейды, False = автопереключение
 
 # ==========================================
+# НАСТРОЙКИ БЫСТРОГО ЛЕЧЕНИЯ С КАРТЫ МИРА
+# ==========================================
+# True = работать только в режиме быстрого лечения с карты мира
+# Игнорирует рейды и автопереключение. Лечит войска через иконку ambulance
+# на карте мира (дикие земли), обрабатывает таймеры.
+FAST_HEAL_FROM_MAP_ENABLED = True
+
+# ==========================================
 # НАСТРОЙКИ ЗОЛОТОДОБЫЧИ
 # ==========================================
 GOLD_ENABLED = False           # True = включить автоматизацию золотодобычи
@@ -52,6 +60,11 @@ HEAL_WAIT_IMG = FOLDER + FOLDER_HEAL + 'heal_wait.png'
 HEAL_HELP_HANDS_IMG = FOLDER + FOLDER_HEAL + 'heal_help_hands.png'
 HEAL_FREE_BUTTON_IMG = FOLDER + FOLDER_HEAL + 'heal_free_button.png'
 FAST_USE_IMG = FOLDER + FOLDER_HEAL + 'fast_use.png'
+
+# Элементы быстрого лечения с карты мира
+AMBULANCE_ON_MAP_IMG = FOLDER + FOLDER_HEAL + 'ambulance.png'
+AMBULANCE_ON_MAP_WIDE_IMG = FOLDER + FOLDER_HEAL + 'ambulance_bottle_wide.png'
+HEAL_HELP_WITH_TIME_IMG = FOLDER + FOLDER_HEAL + 'heal_help_with_time_button.png'
 
 # Элементы помощи
 HELP_HANDS_IMG = FOLDER + FOLDER_HELP + 'help_hands.png'
@@ -129,6 +142,9 @@ class HealState(Enum):
     CONFIRM_BUTTON_REQUIRED = "confirm_button_required"
     MAIL = "mail"
     HELP_HANDS = "help_hands"
+    # Быстрое лечение с карты мира
+    AMBULANCE_ON_MAP = "ambulance_on_map"
+    HEAL_HELP_WITH_TIME = "heal_help_with_time"
 
 
 class RaidState(Enum):

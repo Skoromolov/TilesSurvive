@@ -72,6 +72,12 @@ def main():
                 print("[СИСТЕМА] Обработано повторное переподключение. Завершение.")
                 return
 
+            # Режим быстрого лечения с карты мира (высший приоритет, игнорирует всё остальное)
+            if FAST_HEAL_FROM_MAP_ENABLED:
+                last_heal_state = process_fast_heal_from_map(screen_cv, region, last_heal_state)
+                time.sleep(1)
+                continue
+
             # Принудительный режим RAID
             if FORCE_RAID_ONLY and not FORCE_HEAL_ONLY:
                 current_raid_state = determine_raid_state(screen_cv, region)

@@ -230,3 +230,138 @@ def check_and_click_help_button(screen_cv, region):
     if found:
         print("[HEAL] ✓ Кнопка помощи найдена и нажата!")
     return found
+
+
+# ==========================================
+# БЫСТРОЕ ЛЕЧЕНИЕ С КАРТЫ МИРА
+# ==========================================
+def determine_fast_heal_from_map_state(screen_cv, region):
+    """
+    Определить состояние для быстрого лечения с карты мира.
+    Приоритет: reconnect -> popup -> heal with time -> heal menu -> ambulance -> help -> main screen
+    """
+    coords, _ = find_on_screen(get_template(RECONNECT_IMG), screen_cv, region)
+    if coords:
+        return HealState.RECONNECT_POPUP
+
+    coords, _ = find_on_screen(get_template(RECONNECT_REPEAT_IMG), screen_cv, region)
+    if coords:
+        return HealState.RECONNECT_REPEAT_POPUP
+
+    coords, _ = find_on_screen(get_template(HEAL_HELP_WITH_TIME_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+    if coords:
+        return HealState.HEAL_HELP_WITH_TIME
+
+    coords, _ = find_on_screen(get_template(HEAL_BUTTON_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+    if coords:
+        return HealState.HEAL_MENU_OPEN
+
+    coords, _ = find_on_screen(get_template(HEAL_FREE_BUTTON_IMG), screen_cv, region, threshold=NAVIGATION_THRESHOLD)
+    if coords:
+        return HealState.HEAL_MENU_OPEN
+
+    coords, _ = find_on_screen(get_template(AMBULANCE_ON_MAP_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+    if coords:
+        return HealState.AMBULANCE_ON_MAP
+
+    coords, _ = find_on_screen(get_template(AMBULANCE_ON_MAP_WIDE_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+    if coords:
+        return HealState.AMBULANCE_ON_MAP
+
+    coords, _ = find_on_screen(get_template(HELP_HANDS_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+    if coords:
+        return HealState.HELP_HANDS
+
+    coords, _ = find_on_screen(get_template(WILD_EARTH_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+    if coords:
+        return HealState.MAIN_SCREEN
+
+    return HealState.UNKNOWN
+
+
+def process_fast_heal_from_map(screen_cv, region, last_heal_state):
+    """
+    Обработать один шаг быстрого лечения с карты мира.
+    Цикл: ambulance -> heal_help_with_time -> help_hands -> ambulance
+    """
+    current_state = determine_fast_heal_from_map_state(screen_cv, region)
+
+    if current_state != last_heal_state and current_state.value:
+        print(f"[FAST_HEAL] Состояние: {current_state.value}")
+
+    # Reconnect
+    if current_state == HealState.RECONNECT_POPUP:
+        handle_reconnect(screen_cv, region)
+        return None
+    if current_state == HealState.RECONNECT_REPEAT_POPUP:
+        handle_reconnect_repeat(screen_cv, region)
+        return None
+
+    # Кнопка лечения с таймером (после клика по ambulance)
+    if current_state == HealState.HEAL_HELP_WITH_TIME:
+        try:
+            found, _ = find_and_click(HEAL_HELP_WITH_TIME_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        except Exception as e:
+            print(f"[FAST_HEAL] Error in HEAL_HELP_WITH_TIME: {e}")
+            found = False
+        if found:
+            print("[FAST_HEAL] ✓ Клик по 'лечить' с таймером")
+            # После лечения обычно появляется кнопка помощи или возврат на карту
+            return HealState.HELP_HANDS
+        return None
+
+    # Меню лечения (если сразу открылось без таймера)
+    if current_state == HealState.HEAL_MENU_OPEN:
+        found, _ = find_and_click(HEAL_FREE_BUTTON_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)
+        if found:
+            return HealState.MAIN_SCREEN
+        found, _ = find_and_click(HEAL_BUTTON_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)
+        if found:
+            return HealState.MAIN_SCREEN
+        return None
+
+    # Иконка ambulance на карте мира
+    if current_state == HealState.AMBULANCE_ON_MAP:
+        # Пробуем обычную версию
+        try:
+            found, _ = find_and_click(AMBULANCE_ON_MAP_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        except Exception as e:
+            print(f"[FAST_HEAL] Error in AMBULANCE_ON_MAP: {e}")
+            found = False
+        if found:
+            print("[FAST_HEAL] ✓ Клик по ambulance на карте мира")
+            return HealState.HEAL_HELP_WITH_TIME
+        # Пробуем wide версию если обычная не сработала
+        try:
+            found, _ = find_and_click(AMBULANCE_ON_MAP_WIDE_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        except Exception as e:
+            print(f"[FAST_HEAL] Error in AMBULANCE_ON_MAP_WIDE: {e}")
+            found = False
+        if found:
+            print("[FAST_HEAL] ✓ Клик по ambulance (wide) на карте мира")
+            return HealState.HEAL_HELP_WITH_TIME
+        return None
+
+    # Кнопка помощи союзу
+    if current_state == HealState.HELP_HANDS:
+        try:
+            found, _ = find_and_click(HELP_HANDS_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        except Exception as e:
+            print(f"[FAST_HEAL] Error in HELP_HANDS: {e}")
+            found = False
+        if found:
+            print("[FAST_HEAL] ✓ Клик по кнопке помощи союзу")
+            return HealState.AMBULANCE_ON_MAP
+        return None
+
+    # На главном экране карты мира — ждём появления ambulance
+    if current_state == HealState.MAIN_SCREEN:
+        # Ничего не делаем, просто ждём
+        return HealState.MAIN_SCREEN
+
+    # Неизвестное состояние — ничего не делаем, ждём
+    # (возможно в окне госпиталя с открытым fast use popup)
+    if current_state == HealState.UNKNOWN:
+        return HealState.UNKNOWN
+
+    return HealState.UNKNOWN
