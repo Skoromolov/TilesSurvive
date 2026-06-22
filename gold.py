@@ -134,8 +134,9 @@ def get_list_level(screen_cv, region, threshold=GOLD_LIST_LEVEL_CONFIDENCE_THRES
     return None, None
 
 
-def is_target_level_in_list(screen_cv, region, target=GOLD_LEVEL, threshold=GOLD_LIST_LEVEL_CONFIDENCE_THRESHOLD):
-    """Проверить, виден ли целевой уровень в списке (не обязательно с максимальным conf)."""
+def is_target_level_in_list(screen_cv, region, target=GOLD_LEVEL, threshold=0.95):
+    """Проверить, виден ли целевой уровень в списке. Используем высокий порог, чтобы
+    исключить ложные совпадения lvl_X в других элементах интерфейса."""
     lvl_template = get_template(GOLD_LEVEL_IMAGES[target])
     if lvl_template is None:
         return False
@@ -143,7 +144,7 @@ def is_target_level_in_list(screen_cv, region, target=GOLD_LEVEL, threshold=GOLD
     return coords is not None
 
 
-def click_moveon_for_target_level(screen_cv, region, target=GOLD_LEVEL, lvl_threshold=GOLD_LIST_LEVEL_CONFIDENCE_THRESHOLD, btn_threshold=0.70):
+def click_moveon_for_target_level(screen_cv, region, target=GOLD_LEVEL, lvl_threshold=0.95, btn_threshold=0.70):
     """
     Найти кнопку 'Перейти' (moveOn.png), которая расположена под текстом целевого уровня,
     и кликнуть по ней. Обрабатывает дублирующиеся кнопки на экране.
