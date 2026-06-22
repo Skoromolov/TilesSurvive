@@ -103,6 +103,16 @@ def main():
                     last_heal_state = process_heal(screen_cv, region, last_heal_state)
                     continue
 
+                # Золото
+                if GOLD_ENABLED and (should_do_gold() or gold_mission_should_recall()):
+                    print("[MAIN] Переключение в режим GOLD")
+                    current_mode = MainMode.GOLD
+                    last_gold_state = None
+                    reset_gold_context()
+                    time.sleep(0.2)
+                    gold_start_time = time.time()
+                    continue
+
                 # Автопереключение — проверить кнопки рейда
                 if check_for_raid_button(screen_cv, region):
                     print("[MAIN] Переключение в режим RAID")
@@ -113,16 +123,6 @@ def main():
                     last_join_time = time.time()
                     raid_nav_grace_until = time.time() + 10
                     last_raid_state = None
-                    continue
-
-                # Золото
-                if GOLD_ENABLED and (should_do_gold() or gold_mission_should_recall()):
-                    print("[MAIN] Переключение в режим GOLD")
-                    current_mode = MainMode.GOLD
-                    last_gold_state = None
-                    reset_gold_context()
-                    time.sleep(0.2)
-                    gold_start_time = time.time()
                     continue
 
                 check_and_click_help_button(screen_cv, region)
