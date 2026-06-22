@@ -239,6 +239,11 @@ def determine_gold_state(screen_cv, region):
     if coords:
         return GoldState.CONFIRM_VISIBLE
 
+    # 4.5 Попап "SummaryStrenghtText" — место занято
+    coords, _ = find_on_screen(get_template(GOLD_SUMMARY_STRENGTH_TEXT_IMG), screen_cv, region)
+    if coords:
+        return GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE
+
     # 5. Кнопка "Отозвать" на экране рудника — отряд уже добывает на этом уровне
     coords, _ = find_on_screen(get_template(GOLD_RETURN_IMG), screen_cv, region)
     if coords:
@@ -366,6 +371,13 @@ def process_gold(screen_cv, region, last_gold_state, window):
         print("[GOLD] Нажимаем 'Подтвердить'.")
         find_and_click(GOLD_CONFIRM_IMG, screen_cv, region)
         _gold_ctx['need_level_check'] = True
+        return GoldState.RUDNIK_TAB
+
+    # ---- SUMMARY STRENGTH TEXT POPUP ----
+    if current_state == GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE:
+        print("[GOLD] Место занято (SummaryStrenghtText). Закрываем попап.")
+        find_and_click(CLOSE_IMG, screen_cv, region)
+        _gold_ctx['expected'] = 'rudnik_tab'
         return GoldState.RUDNIK_TAB
 
     # ---- ПРОВЕРКА ЦЕЛЕВОГО УРОВНЯ ПЕРЕД ДОБЫЧЕЙ ----

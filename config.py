@@ -34,7 +34,7 @@ FAST_HEAL_FROM_MAP_ENABLED = False
 # ==========================================
 GOLD_ENABLED = True           # True = включить автоматизацию золотодобычи
 GOLD_INTERVAL = 3600          # Интервал в секундах (1 час)
-GOLD_LEVEL = 2                # Уровень рудника 1-6, на котором работаем
+GOLD_LEVEL = 6                # Уровень рудника 1-6, на котором работаем
 GOLD_MINING_DURATION = 3600   # Интервал добычи в секундах; по истечении отзываем отряд
 GOLD_SEARCH_TIMEOUT = 60      # Таймаут поиска рудника в секундах
 GOLD_TIMEOUT = 300            # Таймаут всего процесса золотодобычи (5 минут)
@@ -111,6 +111,7 @@ GOLD_GO_IMG = FOLDER + FOLDER_GOLD + 'go.png'
 GOLD_MOVEON_IMG = FOLDER + FOLDER_GOLD + 'moveOn.png'
 GOLD_FINISH_IMG = FOLDER + FOLDER_GOLD + 'finish.png'
 GOLD_CONFIRM_IMG = FOLDER + FOLDER_GOLD + 'confirm.png'
+GOLD_SUMMARY_STRENGTH_TEXT_IMG = FOLDER + FOLDER_GOLD + 'summary_strength_text.png'
 GOLD_HAND_IMG = FOLDER + FOLDER_GOLD + 'hand.png'
 
 # ==========================================
@@ -203,6 +204,7 @@ class GoldState(Enum):
     RETURN_BUTTON_VISIBLE = "return_button_visible"
     FINISH_VISIBLE = "finish_visible"
     CONFIRM_VISIBLE = "confirm_visible"
+    SUMMARY_STRENGTH_TEXT_VISIBLE = "summary_strength_text_visible"
     RECONNECT_POPUP = "reconnect_popup"
     RECONNECT_REPEAT_POPUP = "reconnect_repeat_popup"
     FREE_PLACE_VISIBLE = "free_place_visible"
