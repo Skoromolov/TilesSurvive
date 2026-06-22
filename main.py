@@ -91,10 +91,11 @@ def main():
             if (current_mode == MainMode.HEAL) or FORCE_HEAL_ONLY:
                 if FORCE_HEAL_ONLY:
                     # Золото: только если включено и пора
-                    if GOLD_ENABLED and should_do_gold():
+                    if GOLD_ENABLED and (should_do_gold() or gold_mission_should_recall()):
                         print("[MAIN] Переключение в режим GOLD (FORCE_HEAL_ONLY)")
                         current_mode = MainMode.GOLD
                         last_gold_state = None
+                        reset_gold_context()
                         gold_start_time = time.time()
                         continue
                     check_and_click_help_button(screen_cv, region)
@@ -114,10 +115,11 @@ def main():
                     continue
 
                 # Золото
-                if GOLD_ENABLED and should_do_gold():
+                if GOLD_ENABLED and (should_do_gold() or gold_mission_should_recall()):
                     print("[MAIN] Переключение в режим GOLD")
                     current_mode = MainMode.GOLD
                     last_gold_state = None
+                    reset_gold_context()
                     gold_start_time = time.time()
                     continue
 

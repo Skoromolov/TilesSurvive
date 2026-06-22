@@ -27,15 +27,17 @@ FORCE_RAID_ONLY = False   # True = только рейды, False = автопе
 # True = работать только в режиме быстрого лечения с карты мира
 # Игнорирует рейды и автопереключение. Лечит войска через иконку ambulance
 # на карте мира (дикие земли), обрабатывает таймеры.
-FAST_HEAL_FROM_MAP_ENABLED = True
+FAST_HEAL_FROM_MAP_ENABLED = False
 
 # ==========================================
 # НАСТРОЙКИ ЗОЛОТОДОБЫЧИ
 # ==========================================
 GOLD_ENABLED = False           # True = включить автоматизацию золотодобычи
 GOLD_INTERVAL = 3600          # Интервал в секундах (1 час)
+GOLD_LEVEL = 1                # Уровень рудника 1-6, на котором работаем
+GOLD_MINING_DURATION = 2700   # 45 минут = 2700 сек; по прошествии отзываем отряд
 GOLD_SEARCH_TIMEOUT = 60      # Таймаут поиска рудника в секундах
-GOLD_TIMEOUT = 180            # Таймаут всего процесса золотодобычи (3 минуты)
+GOLD_TIMEOUT = 300            # Таймаут всего процесса золотодобычи (5 минут)
 
 # ==========================================
 # КОНСТАНТЫ ИЗОБРАЖЕНИЙ
@@ -47,8 +49,8 @@ RECONNECT_IMG = FOLDER + FOLDER_COMMON + 'reconnect.png'
 RECONNECT_REPEAT_IMG = FOLDER + FOLDER_COMMON + 'reconnectRepeat.png'
 SOUZ_IMG = FOLDER + FOLDER_COMMON + 'souz.png'
 NEWS_IMG = FOLDER + FOLDER_COMMON + 'news.png'
-VILLAGE_IMG = FOLDER + FOLDER_COMMON + 'village_footbool.png'
-WILD_EARTH_IMG = FOLDER + FOLDER_COMMON + 'wild_earth_footbool.png'
+VILLAGE_IMG = FOLDER + FOLDER_COMMON + 'village.png'
+WILD_EARTH_IMG = FOLDER + FOLDER_COMMON + 'wild_earth.png'
 CLOSE_IMG = FOLDER + FOLDER_COMMON + 'close.png'
 BACK_IMG = FOLDER + FOLDER_COMMON + 'back.png'
 EVENTS_IMG = FOLDER + FOLDER_COMMON + 'events.png'
@@ -84,13 +86,27 @@ RAID_FULL_IMG = FOLDER + FOLDER_RAID + 'raid_full.png'
 # Элементы золотодобычи
 GOLD_RUDNIK_IMG = FOLDER + FOLDER_GOLD + 'rudnik.png'
 GOLD_RUDNIK_OPENED_IMG = FOLDER + FOLDER_GOLD + 'rudnik_opened.png'
+GOLD_SELECT_LEVEL_IMG = FOLDER + FOLDER_GOLD + 'select_level.png'
+GOLD_LEVEL_IMAGES = {
+    level: FOLDER + FOLDER_GOLD + f'lvl_{level}.png'
+    for level in range(1, 7)
+}
+GOLD_CURRENT_LEVEL_IMAGES = {
+    level: FOLDER + FOLDER_GOLD + f'current_lvl_{level}.png'
+    for level in range(1, 7)
+}
+GOLD_CURRENT_RAID_LEVEL_ICON_IMG = FOLDER + FOLDER_GOLD + 'current_raid_lvl_icon.png'
 GOLD_FIND_IMG = FOLDER + FOLDER_GOLD + 'find.png'
 GOLD_MY_RUDNIK_IMG = FOLDER + FOLDER_GOLD + 'my_rudnik.png'
 GOLD_RETURN_IMG = FOLDER + FOLDER_GOLD + 'return.png'
 GOLD_RETURN_BOYS_IMG = FOLDER + FOLDER_GOLD + 'return_boys.png'
+GOLD_FREE_PLACE_IMG = FOLDER + FOLDER_GOLD + 'free_place.png'
 GOLD_GRIND_IMG = FOLDER + FOLDER_GOLD + 'grind.png'
 GOLD_WORK_IMG = FOLDER + FOLDER_GOLD + 'work.png'
 GOLD_GO_IMG = FOLDER + FOLDER_GOLD + 'go.png'
+GOLD_FINISH_IMG = FOLDER + FOLDER_GOLD + 'finish.png'
+GOLD_CONFIRM_IMG = FOLDER + FOLDER_GOLD + 'confirm.png'
+GOLD_HAND_IMG = FOLDER + FOLDER_GOLD + 'hand.png'
 
 # ==========================================
 # ПАРАМЕТРЫ ЧУВСТВИТЕЛЬНОСТИ
@@ -168,7 +184,11 @@ class GoldState(Enum):
     UNKNOWN = "unknown"
     MAIN_SCREEN = "main_screen"
     EVENTS_OPEN = "events_open"
+    EVENTS_NEED_SCROLL = "events_need_scroll"
     RUDNIK_TAB = "rudnik_tab"
+    SELECT_LEVEL_VISIBLE = "select_level_visible"
+    LEVEL_LIST_VISIBLE = "level_list_visible"
+    RAID_LEVEL_ICON_VISIBLE = "raid_level_icon_visible"
     FIND_VISIBLE = "find_visible"
     GRIND_VISIBLE = "grind_visible"
     WORK_VISIBLE = "work_visible"
@@ -177,4 +197,5 @@ class GoldState(Enum):
     RETURN_CONFIRM_VISIBLE = "return_confirm_visible"
     RECONNECT_POPUP = "reconnect_popup"
     RECONNECT_REPEAT_POPUP = "reconnect_repeat_popup"
+    FREE_PLACE_VISIBLE = "free_place_visible"
     COMPLETED = "completed"

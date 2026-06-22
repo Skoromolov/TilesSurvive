@@ -423,3 +423,44 @@ pynput
 ```bash
 pip install numpy opencv-python pyautogui pygetwindow pywin32 pynput
 ```
+
+---
+
+## Золотодобыча (кратко)
+
+Подробное описание — в `docs/GOLD_MODULE.md`. Краткая схема:
+
+```
+HEAL
+  ↓  GOLD_ENABLED and (should_do_gold() or gold_mission_should_recall())
+GOLD
+  ↓
+MAIN_SCREEN → EVENTS_OPEN → [swipe right] → RUDNIK_TAB
+  ↓
+get_current_level() != GOLD_LEVEL ?
+  Да  → SELECT_LEVEL_VISIBLE → LEVEL_LIST_VISIBLE → click_level_go_button() → RUDNIK_TAB
+  Нет → FIND_VISIBLE
+  ↓
+click find.png каждую секунду
+  ↓
+FREE_PLACE_VISIBLE → GRIND_VISIBLE → WORK_VISIBLE → GO_VISIBLE → COMPLETED
+```
+
+Если отряд уже добывает:
+
+```
+MY_RUDNIK_VISIBLE / RAID_LEVEL_ICON_VISIBLE
+  ↓
+click current_raid_lvl_icon.png → RUDNIK_TAB → get_current_level()
+  ↓
+if elapsed >= GOLD_MINING_DURATION:
+    recall_requested = True → click return.png → return_boys.png → FIND_VISIBLE
+else:
+    update_gold_time() → COMPLETED
+```
+
+Основные функции:
+- `determine_gold_state()` — приоритетная классификация экрана.
+- `process_gold()` — одно действие за итерацию.
+- `process_gold_exit()` — выход из меню рудника.
+- `get_current_level()` / `get_list_level()` / `click_level_go_button()` — работа с уровнями.

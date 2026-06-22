@@ -160,6 +160,60 @@ def find_and_click(template_path, screen_cv, region, threshold=CONFIDENCE_THRESH
         return False, None
 
 
+def find_all_on_screen(template, screen_cv, region, threshold=CONFIDENCE_THRESHOLD):
+    """
+    Найти ВСЕ вхождения шаблона на экране с помощью matchTemplate + non-max suppression.
+    Возвращает: [(center_x, center_y, conf), ...] в координатах экрана.
+    """
+    if template is None:
+        return []
+    res = cv2.matchTemplate(screen_cv, template, cv2.TM_CCOEFF_NORMED)
+    loc = np.where(res >= threshold)
+    h, w = template.shape[:2]
+    matches = []
+    for pt in zip(*loc[::-1]):
+        cx = region[0] + pt[0] + w / 2
+        cy = region[1] + pt[1] + h / 2
+        matches.append((cx, cy, float(res[pt[1], pt[0]])))
+
+    # простое подавление близких дубликатов
+    filtered = []
+    for m in sorted(matches, key=lambda x: x[2], reverse=True):
+        if not any(abs(m[0] - f[0]) < w * 0.8 and abs(m[1] - f[1]) < h * 0.8 for f in filtered):
+            filtered.append(m)
+    return filtered
+
+
+def swipe_horizontal(region, direction="right", duration=0.5):
+    """
+    Горизонтальный свайп в верхней части окна BlueStacks.
+    direction: 'right' или 'left'.
+    """
+    x1 = region[0] + int(region[2] * 0.75)
+    x2 = region[0] + int(region[2] * 0.25)
+    y = region[1] + int(region[3] * 0.25)
+    if direction == "left":
+        x1, x2 = x2, x1
+    pyautogui.moveTo(x1, y, duration=0.2)
+    pyautogui.dragTo(x2, y, duration=duration, button="left")
+    print(f"[SWIPE] {direction}: ({x1},{y}) -> ({x2},{y})")
+
+
+def scroll_in_region(region, direction="down", duration=0.5):
+    """
+    Вертикальный скролл (drag) в центре окна.
+    direction: 'down' или 'up'.
+    """
+    cx = region[0] + region[2] // 2
+    y1 = region[1] + int(region[3] * 0.65)
+    y2 = region[1] + int(region[3] * 0.35)
+    if direction == "up":
+        y1, y2 = y2, y1
+    pyautogui.moveTo(cx, y1, duration=0.2)
+    pyautogui.dragTo(cx, y2, duration=duration, button="left")
+    print(f"[SCROLL] {direction}: ({cx},{y1}) -> ({cx},{y2})")
+
+
 # ==========================================
 # ОБРАБОТКА RECONNECT
 # ==========================================
