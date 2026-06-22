@@ -22,6 +22,7 @@ _gold_ctx = {
     'started_at': None,        # timestamp запуска добычи
     'current_mining_level': None,
     'recall_requested': False,
+    'need_level_check': False, # флаг: нужно убедиться, что мы на целевом уровне
 }
 
 
@@ -89,6 +90,7 @@ def reset_gold_context():
     _gold_ctx['stuck_count'] = 0
     _gold_ctx['stuck_last_action'] = None
     _gold_ctx['raid_icon_clicks'] = 0
+    _gold_ctx['need_level_check'] = False
 
 
 # ==========================================
@@ -319,6 +321,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
         find_and_click(GOLD_RETURN_BOYS_IMG, screen_cv, region)
         clear_gold_mission()
         _gold_ctx['expected'] = 'rudnik_tab'
+        _gold_ctx['need_level_check'] = True
         print("[GOLD] Отряд отозван.")
         return GoldState.RUDNIK_TAB
 
@@ -326,13 +329,31 @@ def process_gold(screen_cv, region, last_gold_state, window):
     if current_state == GoldState.FINISH_VISIBLE:
         print("[GOLD] Нажимаем 'Завершить' после отзыва отряда.")
         find_and_click(GOLD_FINISH_IMG, screen_cv, region)
+        _gold_ctx['need_level_check'] = True
         return GoldState.RUDNIK_TAB
 
     # ---- CONFIRM BUTTON ----
     if current_state == GoldState.CONFIRM_VISIBLE:
         print("[GOLD] Нажимаем 'Подтвердить'.")
         find_and_click(GOLD_CONFIRM_IMG, screen_cv, region)
+        _gold_ctx['need_level_check'] = True
         return GoldState.RUDNIK_TAB
+
+    # ---- ПРОВЕРКА ЦЕЛЕВОГО УРОВНЯ ПЕРЕД ДОБЫЧЕЙ ----
+    # После отзыва/подтверждения обязательно проверяем, что мы на нужном уровне,
+    # прежде чем нажимать find / free_place / grind / work / go.
+    if _gold_ctx.get('need_level_check'):
+        current = get_current_level(screen_cv, region)
+        if current is not None and current != GOLD_LEVEL:
+            print(f"[GOLD] Уровень {current}, нужен {GOLD_LEVEL}. Открываем выбор уровня перед добычей.")
+            find_and_click(GOLD_SELECT_LEVEL_IMG, screen_cv, region)
+            _gold_ctx['expected'] = 'level_list'
+            _gold_ctx['level_select_scroll_tries'] = 0
+            time.sleep(GOLD_ACTION_DELAY)
+            return GoldState.SELECT_LEVEL_VISIBLE
+        elif current == GOLD_LEVEL:
+            _gold_ctx['need_level_check'] = False
+            print(f"[GOLD] Уровень проверен: {current}. Продолжаем добычу.")
 
     # ---- GO / WORK / GRIND ----
     if current_state == GoldState.GO_VISIBLE:
@@ -397,12 +418,17 @@ def process_gold(screen_cv, region, last_gold_state, window):
         current = get_current_level(screen_cv, region)
 
         if current is not None and current != GOLD_LEVEL:
+            _gold_ctx['need_level_check'] = True
             print(f"[GOLD] Уровень {current}, нужен {GOLD_LEVEL}. Открываем выбор уровня.")
             find_and_click(GOLD_SELECT_LEVEL_IMG, screen_cv, region)
             _gold_ctx['expected'] = 'level_list'
             _gold_ctx['level_select_scroll_tries'] = 0
             time.sleep(GOLD_ACTION_DELAY)
             return GoldState.SELECT_LEVEL_VISIBLE
+
+        # Уровень совпадает — сбрасываем флаг проверки
+        if current == GOLD_LEVEL:
+            _gold_ctx['need_level_check'] = False
 
         # Уровень совпадает или не удалось распознать — начинаем поиск
         find_and_click(GOLD_FIND_IMG, screen_cv, region)
