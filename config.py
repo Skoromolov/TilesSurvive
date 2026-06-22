@@ -201,6 +201,7 @@ class GoldState(Enum):
     RETURN_CONFIRM_VISIBLE = "return_confirm_visible"
     RETURN_BUTTON_VISIBLE = "return_button_visible"
     FINISH_VISIBLE = "finish_visible"
+    CONFIRM_VISIBLE = "confirm_visible"
     RECONNECT_POPUP = "reconnect_popup"
     RECONNECT_REPEAT_POPUP = "reconnect_repeat_popup"
     FREE_PLACE_VISIBLE = "free_place_visible"
