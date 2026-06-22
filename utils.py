@@ -184,14 +184,16 @@ def find_all_on_screen(template, screen_cv, region, threshold=CONFIDENCE_THRESHO
     return filtered
 
 
-def swipe_horizontal(region, direction="right", duration=0.5):
+def swipe_horizontal(region, direction="right", duration=0.5, y_offset=30):
     """
     Горизонтальный свайп в верхней части окна BlueStacks.
     direction: 'right' или 'left'.
+    y_offset: фиксированный отступ от верхнего края окна (по умолчанию 30 px),
+              чтобы свайп проходил по верхнему меню/карусели событий.
     """
-    x1 = region[0] + int(region[2] * 0.75)
-    x2 = region[0] + int(region[2] * 0.25)
-    y = region[1] + int(region[3] * 0.25)
+    x1 = region[0] + int(region[2] * 0.80)
+    x2 = region[0] + int(region[2] * 0.20)
+    y = region[1] + y_offset
     if direction == "left":
         x1, x2 = x2, x1
     pyautogui.moveTo(x1, y, duration=0.2)
