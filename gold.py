@@ -353,10 +353,20 @@ def process_gold(screen_cv, region, last_gold_state, window):
 
     # ---- RETURN BUTTON ----
     if current_state == GoldState.RETURN_BUTTON_VISIBLE:
-        print("[GOLD] Отряд занят добычей на этом уровне. Отзываем.")
-        find_and_click(GOLD_RETURN_IMG, screen_cv, region)
-        _gold_ctx['recall_requested'] = True
-        return GoldState.RETURN_CONFIRM_VISIBLE
+        # Отзыв только если он был явно запрошен (истекли 45 минут)
+        if _gold_ctx.get('recall_requested'):
+            print("[GOLD] Отряд занят добычей на этом уровне. Отзываем.")
+            find_and_click(GOLD_RETURN_IMG, screen_cv, region)
+            return GoldState.RETURN_CONFIRM_VISIBLE
+        # Иначе добыча только что запущена — return.png видна потому что отряд
+        # уже на руднике. Считаем запуск успешным и выходим.
+        current = get_current_level(screen_cv, region)
+        if current:
+            _gold_ctx['current_mining_level'] = current
+        start_gold_mission()
+        update_gold_time()
+        print("[GOLD] ✓ Золотодобыча запущена (return.png видна, отзыв не требуется).")
+        return GoldState.COMPLETED
 
     # ---- RETURN CONFIRM ----
     if current_state == GoldState.RETURN_CONFIRM_VISIBLE:
