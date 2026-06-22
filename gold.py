@@ -23,6 +23,7 @@ _gold_ctx = {
     'current_mining_level': None,
     'recall_requested': False,
     'need_level_check': False, # флаг: нужно убедиться, что мы на целевом уровне
+    'moveon_clicked_at': None, # timestamp последнего клика moveOn
 }
 
 
@@ -91,6 +92,7 @@ def reset_gold_context():
     _gold_ctx['stuck_last_action'] = None
     _gold_ctx['raid_icon_clicks'] = 0
     _gold_ctx['need_level_check'] = False
+    _gold_ctx['moveon_clicked_at'] = None
 
 
 # ==========================================
@@ -184,6 +186,14 @@ def click_moveon_for_target_level(screen_cv, region, target=GOLD_LEVEL, lvl_thre
         return False
 
     cx_btn, cy_btn, conf_btn, cx_lvl, cy_lvl, conf_lvl = best_pair
+    btn_top = cy_btn - h_btn / 2
+    btn_bottom = cy_btn + h_btn / 2
+    region_top = region[1]
+    region_bottom = region[1] + region[3]
+    if btn_top < region_top + 20 or btn_bottom > region_bottom - 20:
+        print(f"[GOLD] Кнопка 'Перейти' под уровнем {target} частично за краем экрана. Скроллим.")
+        return False
+
     pyautogui.click(cx_btn, cy_btn)
     print(f"[GOLD] Нажата 'Перейти' под уровнем {target} ({cx_btn:.0f}, {cy_btn:.0f}), conf=({conf_lvl:.3f}/{conf_btn:.3f})")
     return True
@@ -464,6 +474,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
             if click_moveon_for_target_level(screen_cv, region, target=GOLD_LEVEL):
                 _gold_ctx['expected'] = 'rudnik_tab'
                 _gold_ctx['level_select_scroll_tries'] = 0
+                _gold_ctx['moveon_clicked_at'] = time.time()
                 time.sleep(GOLD_ACTION_DELAY)
                 return GoldState.RUDNIK_TAB
 
@@ -485,7 +496,8 @@ def process_gold(screen_cv, region, last_gold_state, window):
         else:
             direction = 'up'
 
-        scroll_in_region(region, direction, step_ratio=0.12)
+        scroll_in_region(region, direction, step_ratio=0.08)
+        time.sleep(0.2)
         return GoldState.LEVEL_LIST_VISIBLE
 
     # ---- FIND (поиск свободного рудника) ----
@@ -523,20 +535,28 @@ def process_gold(screen_cv, region, last_gold_state, window):
 
     # ---- UNKNOWN / STUCK RECOVERY ----
     if current_state == GoldState.UNKNOWN:
-        _gold_ctx['stuck_count'] = _gold_ctx.get('stuck_count', 0) + 1
-        if _gold_ctx['stuck_count'] >= 2:
-            action = _gold_ctx.get('stuck_last_action')
-            if action != 'back':
-                find_and_click(BACK_IMG, screen_cv, region)
-                _gold_ctx['stuck_last_action'] = 'back'
-            elif action != 'close':
-                find_and_click(CLOSE_IMG, screen_cv, region)
-                _gold_ctx['stuck_last_action'] = 'close'
-            else:
-                find_and_click(VILLAGE_IMG, screen_cv, region)
-                _gold_ctx['stuck_last_action'] = None
-                _gold_ctx['stuck_count'] = 0
+        # Если только что кликнули 'Перейти' — подождём, пока экран перейдёт в RUDNIK_TAB,
+        # не нажимая back.png сразу.
+        clicked_at = _gold_ctx.get('moveon_clicked_at')
+        if clicked_at and (time.time() - clicked_at) < 2.0:
+            print("[GOLD] Ожидаем завершения перехода после клика 'Перейти'.")
+            _gold_ctx['moveon_clicked_at'] = None
+            time.sleep(GOLD_ACTION_DELAY)
             return GoldState.UNKNOWN
+
+        _gold_ctx['stuck_count'] = _gold_ctx.get('stuck_count', 0) + 1
+        action = _gold_ctx.get('stuck_last_action')
+        if action != 'back':
+            find_and_click(BACK_IMG, screen_cv, region)
+            _gold_ctx['stuck_last_action'] = 'back'
+        elif action != 'close':
+            find_and_click(CLOSE_IMG, screen_cv, region)
+            _gold_ctx['stuck_last_action'] = 'close'
+        else:
+            find_and_click(VILLAGE_IMG, screen_cv, region)
+            _gold_ctx['stuck_last_action'] = None
+            _gold_ctx['stuck_count'] = 0
+
         time.sleep(GOLD_ACTION_DELAY)
         return GoldState.UNKNOWN
 
