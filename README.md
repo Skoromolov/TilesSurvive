@@ -179,18 +179,105 @@ python main.py
 ### Золотодобыча
 
 В режиме лечения (если `GOLD_ENABLED = True`):
-- Скрипт проверяет таймер золотодобычи (по умолчанию 1 час) и 45-минутный таймер активной добычи.
-- Если время пришло или отряд уже добывает ≥45 минут → переключается на рудник.
+- **При первом запуске скрипта** сразу переключается в режим GOLD.
+- **После успешного старта добычи** ждёт `GOLD_INTERVAL` (по умолчанию **30 минут**), затем снова идёт искать место.
+- **Активная добыча** длится `GOLD_MINING_DURATION` (по умолчанию **45 минут**), после чего отряд отзывается и бот ищет новое место.
 - Выполняет процесс:
-  1. Открывает события и свайпит вправо, пока не найдёт рудник (`rudnik.png` / `rudnik_opened.png`).
+  1. Открывает события и свайпит вправо по верхней полосе, пока не найдёт рудник (`rudnik.png` / `rudnik_opened.png`).
   2. Проверяет текущий уровень (`current_lvl_X`).
   3. При необходимости открывает выбор уровня (`select_level.png`), скроллит список `lvl_X.png` и нажимает «Перейти» в карточке целевого уровня.
-  4. Нажимает «Поиск» (`find.png`) каждую секунду, пока не появится `free_place.png`.
-  5. grind → work → go — отправляет отряд.
+  4. Нажимает «Поиск» (`find.png`), пока не появится `free_place.png`.
+  5.grind → work → go — отправляет отряд.
+  6. Проверяет, что рудник занят (`return.png` / `my_rudnik.png`).
+- Если попап занятого места (`SummaryStrenghtText`) — нажимает `join.png`, если она есть; иначе закрывает через `pictures/gold/close.png`.
 - Если отряд уже добывает (`my_rudnik.png` / `current_raid_lvl_icon.png`), открывает детали, определяет уровень и отзывает отряд через 45 минут.
 - Возвращается к лечению (с таймаутом защиты `GOLD_TIMEOUT`).
 
 > Золотодобыча реализована как **стейт-машина** (`determine_gold_state` + `process_gold`), аналогично лечению и рейдам. Это делает процесс устойчивым к неожиданным всплывающим окнам и лагам интерфейса — каждая итерация снимает актуальный скриншот и действует исходя из реального состояния экрана.
+
+#### Схема процесса золотодобычи (PlantUML)
+
+```plantuml
+@startuml
+skinparam backgroundColor #FEFEFE
+skinparam handwritten false
+title Процесс золотодобычи (GoldState machine)
+
+start
+
+if (GOLD_ENABLED?) then (нет)
+  :Остаёмся в HEAL;
+  stop
+endif
+
+if (Первый запуск?) then (да)
+  :Сразу перейти в GOLD;
+else (нет)
+  if (Прошло GOLD_INTERVAL\n30 минут?) then (нет)
+    :Ожидание;
+    stop
+  endif
+endif
+
+:main_screen;
+:Нажать events.png;
+:Ждать открытия меню событий;
+
+while (rudnik.png /\nrudnik_opened.png?) is (нет)
+  :Свайп вправо по верхней полосе;
+endwhile (да)
+
+:rudnik_tab;
+:Определить current_lvl_X;
+
+if (Уровень == GOLD_LEVEL?) then (нет)
+  :Нажать select_level.png;
+  while (Целевой lvl_X?) is (нет)
+    :Скролл списка уровней;
+  endwhile
+  :Нажать Перейти\n(moveOn.png в карточке уровня);
+endif
+
+repeat
+  :Нажать find.png;
+  :Искать free_place.png;
+repeat while (free_place.png?) is (нет) not (да)
+
+:grind.png → work/join.png → go.png;
+
+if (return.png / my_rudnik.png\nпосле Марш?) then (да)
+  :Запуск засчитан;
+  :update_gold_time();
+  :Вернуться в HEAL;
+  stop
+else (нет)
+  if (SummaryStrenghtText popup?) then (да)
+    if (join.png в попапе?) then (да)
+      :Нажать join.png;
+      :Повторить work → go;
+    else (нет)
+      :Нажать pictures/gold/close.png;
+    endif
+  else (нет)
+    :Нажать pictures/gold/close.png;
+  endif
+  :Вернуться в rudnik_tab;
+endif
+
+while (Отряд добывает?) is (да)
+  :Проверить current_raid_lvl_icon\nи current_lvl_X;
+  if (Прошло 45 минут?) then (да)
+    :Отозвать отряд (return.png);
+    :Искать новое место;
+  else (нет)
+    :Вернуться в HEAL;
+  endif
+endwhile (нет)
+
+stop
+
+@enduml
+```
 
 ## Обработка ошибок
 
