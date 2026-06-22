@@ -457,15 +457,18 @@ def process_gold(screen_cv, region, last_gold_state, window):
             or _gold_ctx.get('expected') == 'level_list':
         target_path = GOLD_LEVEL_IMAGES[GOLD_LEVEL]
 
-        # 1. Ищем ТОЛЬКО целевой уровень и кликаем 'Перейти' под ним
-        if click_moveon_for_target_level(screen_cv, region, target=GOLD_LEVEL):
-            _gold_ctx['expected'] = 'rudnik_tab'
-            _gold_ctx['level_select_scroll_tries'] = 0
-            time.sleep(GOLD_ACTION_DELAY)
-            return GoldState.RUDNIK_TAB
-
-        # 2. Целевой не виден — определяем направление по любому видимому уровню
+        # 1. Сначала проверяем, какой уровень виден в списке лучше всего
         found_level, _ = get_list_level(screen_cv, region)
+        if found_level == GOLD_LEVEL:
+            # Целевой уровень точно виден — ищем его кнопку 'Перейти'
+            if click_moveon_for_target_level(screen_cv, region, target=GOLD_LEVEL):
+                _gold_ctx['expected'] = 'rudnik_tab'
+                _gold_ctx['level_select_scroll_tries'] = 0
+                time.sleep(GOLD_ACTION_DELAY)
+                return GoldState.RUDNIK_TAB
+
+        # 2. Целевой не виден — скроллим в направлении целевого уровня
+
 
         _gold_ctx['level_select_scroll_tries'] = _gold_ctx.get('level_select_scroll_tries', 0) + 1
         if _gold_ctx['level_select_scroll_tries'] > 20:
