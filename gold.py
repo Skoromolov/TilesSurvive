@@ -134,6 +134,15 @@ def get_list_level(screen_cv, region, threshold=GOLD_LIST_LEVEL_CONFIDENCE_THRES
     return None, None
 
 
+def is_target_level_in_list(screen_cv, region, target=GOLD_LEVEL, threshold=GOLD_LIST_LEVEL_CONFIDENCE_THRESHOLD):
+    """Проверить, виден ли целевой уровень в списке (не обязательно с максимальным conf)."""
+    lvl_template = get_template(GOLD_LEVEL_IMAGES[target])
+    if lvl_template is None:
+        return False
+    coords, conf = find_on_screen(lvl_template, screen_cv, region, threshold)
+    return coords is not None
+
+
 def click_moveon_for_target_level(screen_cv, region, target=GOLD_LEVEL, lvl_threshold=GOLD_LIST_LEVEL_CONFIDENCE_THRESHOLD, btn_threshold=0.70):
     """
     Найти кнопку 'Перейти' (moveOn.png), которая расположена под текстом целевого уровня,
@@ -142,7 +151,7 @@ def click_moveon_for_target_level(screen_cv, region, target=GOLD_LEVEL, lvl_thre
     Логика: для каждой найденной кнопки 'Перейти' ищем текст целевого уровня
     непосредственно над ней. Так мы точно привязываем кнопку к карточке уровня.
     """
-    # 1. Находим все кнопки 'Перейти'
+
     btn_template = get_template(GOLD_MOVEON_IMG)
     if btn_template is None:
         return False
@@ -467,10 +476,8 @@ def process_gold(screen_cv, region, last_gold_state, window):
             or _gold_ctx.get('expected') == 'level_list':
         target_path = GOLD_LEVEL_IMAGES[GOLD_LEVEL]
 
-        # 1. Сначала проверяем, какой уровень виден в списке лучше всего
-        found_level, _ = get_list_level(screen_cv, region)
-        if found_level == GOLD_LEVEL:
-            # Целевой уровень точно виден — ищем его кнопку 'Перейти'
+        # 1. Если целевой уровень виден в списке — пробуем нажать 'Перейти' под ним
+        if is_target_level_in_list(screen_cv, region, target=GOLD_LEVEL):
             if click_moveon_for_target_level(screen_cv, region, target=GOLD_LEVEL):
                 _gold_ctx['expected'] = 'rudnik_tab'
                 _gold_ctx['level_select_scroll_tries'] = 0
@@ -478,7 +485,8 @@ def process_gold(screen_cv, region, last_gold_state, window):
                 time.sleep(GOLD_ACTION_DELAY)
                 return GoldState.RUDNIK_TAB
 
-        # 2. Целевой не виден — скроллим в направлении целевого уровня
+        # 2. Иначе определяем направление по любому видимому уровню и скроллим
+        found_level, _ = get_list_level(screen_cv, region)
 
 
         _gold_ctx['level_select_scroll_tries'] = _gold_ctx.get('level_select_scroll_tries', 0) + 1
