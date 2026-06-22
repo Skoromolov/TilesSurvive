@@ -160,29 +160,13 @@ def main():
 
                 # Если добыча завершена — выходим
                 if last_gold_state == GoldState.COMPLETED:
-                    # Сначала выходим из окна рудника / событий
-                    if gold_exit_state != GoldState.COMPLETED:
-                        if gold_exit_state is None:
-                            gold_exit_state = last_gold_state
-                        gold_exiting = True
-                        print("[MAIN] Золотодобыча завершена, выходим из окна золота")
-                        gold_exit_state = process_gold_exit(screen_cv, region, gold_exit_state, window)
-                        if gold_exit_state == GoldState.COMPLETED:
-                            print("[MAIN] Вышли из окна золота, возврат к лечению")
-                            current_mode = MainMode.HEAL
-                            last_gold_state = None
-                            gold_exit_state = None
-                            gold_start_time = None
-                            gold_exiting = False
-                        continue
-                    else:
-                        print("[MAIN] Золотодобыча завершена, возврат к лечению")
-                        current_mode = MainMode.HEAL
-                        last_gold_state = None
-                        gold_exit_state = None
-                        gold_start_time = None
-                        gold_exiting = False
-                        continue
+                    print("[MAIN] Золотодобыча завершена, возврат к лечению")
+                    current_mode = MainMode.HEAL
+                    last_gold_state = None
+                    gold_exit_state = None
+                    gold_start_time = None
+                    gold_exiting = False
+                    continue
 
             # Режим RAID
             elif current_mode == MainMode.RAID:
