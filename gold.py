@@ -130,45 +130,51 @@ def get_list_level(screen_cv, region, threshold=GOLD_LIST_LEVEL_CONFIDENCE_THRES
     return None, None
 
 
-def find_target_level_in_list(screen_cv, region, target=GOLD_LEVEL, threshold=GOLD_LIST_LEVEL_CONFIDENCE_THRESHOLD):
-    """Искать в списке только целевой уровень. Возвращает (center_coords, conf) или (None, 0)."""
-    target_path = GOLD_LEVEL_IMAGES[target]
-    template = get_template(target_path)
-    if template is None:
-        return None, 0.0
-    coords, conf = find_on_screen(template, screen_cv, region, threshold)
-    if coords:
-        print(f"[GOLD] Целевой уровень {target} найден в списке (conf={conf:.3f})")
-    return coords, conf
-
-
-def click_level_go_button(level_path, screen_cv, region, coords=None, threshold=CONFIDENCE_MEDIUM_THRESHOLD):
+def click_moveon_for_target_level(screen_cv, region, target=GOLD_LEVEL, lvl_threshold=GOLD_LIST_LEVEL_CONFIDENCE_THRESHOLD, btn_threshold=CONFIDENCE_MEDIUM_THRESHOLD):
     """
-    Кликнуть по кнопке 'Перейти' внутри карточки lvl_X.png.
-    Если переданы coords (центр найденного lvl_X), кликаем в нижней части этой же карточки.
+    Найти кнопку 'Перейти' (moveOn.png), которая расположена под текстом целевого уровня,
+    и кликнуть по ней. Обрабатывает дублирующиеся кнопки на экране.
     """
-    template = get_template(level_path)
-    if template is None:
+    # 1. Находим целевой текст уровня
+    lvl_template = get_template(GOLD_LEVEL_IMAGES[target])
+    if lvl_template is None:
+        return False
+    h_lvl, w_lvl = lvl_template.shape[:2]
+    lvl_matches = find_all_on_screen(lvl_template, screen_cv, region, lvl_threshold)
+    if not lvl_matches:
+        return False
+    # Берём лучшее совпадение целевого уровня
+    cx_lvl, cy_lvl, conf_lvl = max(lvl_matches, key=lambda m: m[2])
+    lvl_bottom = cy_lvl + h_lvl / 2
+
+    # 2. Находим все кнопки 'Перейти'
+    btn_template = get_template(GOLD_MOVEON_IMG)
+    if btn_template is None:
+        return False
+    h_btn, w_btn = btn_template.shape[:2]
+    btn_matches = find_all_on_screen(btn_template, screen_cv, region, btn_threshold)
+    if not btn_matches:
         return False
 
-    if coords is None:
-        res = cv2.matchTemplate(screen_cv, template, cv2.TM_CCOEFF_NORMED)
-        _, max_val, _, max_loc = cv2.minMaxLoc(res)
-        if max_val < threshold:
-            return False
-        h, w = template.shape[:2]
-        click_x = region[0] + max_loc[0] + w / 2
-        click_y = region[1] + max_loc[1] + h * 0.85
-    else:
-        h, w = template.shape[:2]
-        click_x = coords[0]
-        click_y = coords[1] + h * 0.30  # кнопка "Перейти" в нижней части карточки (0.8 от верха)
-        max_val = None
+    # 3. Выбираем кнопку, которая ближе всего расположена под текстом уровня
+    candidates = []
+    for cx_btn, cy_btn, conf_btn in btn_matches:
+        btn_top = cy_btn - h_btn / 2
+        vertical_gap = btn_top - lvl_bottom
+        horizontal_gap = abs(cx_btn - cx_lvl)
+        # Кнопка должна быть под текстом (не выше более чем на полвысины кнопки)
+        # и по горизонтали примерно совпадать с текстом уровня
+        if vertical_gap > -h_btn * 0.3 and vertical_gap < h_btn * 4 and horizontal_gap < w_btn * 0.6:
+            candidates.append((vertical_gap, cx_btn, cy_btn, conf_btn))
 
+    if not candidates:
+        print(f"[GOLD] Кнопка 'Перейти' под уровнем {target} не найдена (возможно, за краем экрана).")
+        return False
+
+    candidates.sort(key=lambda x: x[0])
+    _, click_x, click_y, conf_btn = candidates[0]
     pyautogui.click(click_x, click_y)
-    print(f"[GOLD] Нажата 'Перейти' для целевого уровня ({click_x:.0f}, {click_y:.0f})")
-    if max_val is not None:
-        print(f"[GOLD] conf={max_val:.3f}")
+    print(f"[GOLD] Нажата 'Перейти' под уровнем {target} ({click_x:.0f}, {click_y:.0f}), conf=({conf_lvl:.3f}/{conf_btn:.3f})")
     return True
 
 
@@ -408,14 +414,12 @@ def process_gold(screen_cv, region, last_gold_state, window):
             or _gold_ctx.get('expected') == 'level_list':
         target_path = GOLD_LEVEL_IMAGES[GOLD_LEVEL]
 
-        # 1. Ищем ТОЛЬКО целевой уровень
-        target_coords, target_conf = find_target_level_in_list(screen_cv, region)
-        if target_coords:
-            if click_level_go_button(target_path, screen_cv, region, coords=target_coords):
-                _gold_ctx['expected'] = 'rudnik_tab'
-                _gold_ctx['level_select_scroll_tries'] = 0
-                time.sleep(GOLD_ACTION_DELAY)
-                return GoldState.RUDNIK_TAB
+        # 1. Ищем ТОЛЬКО целевой уровень и кликаем 'Перейти' под ним
+        if click_moveon_for_target_level(screen_cv, region, target=GOLD_LEVEL):
+            _gold_ctx['expected'] = 'rudnik_tab'
+            _gold_ctx['level_select_scroll_tries'] = 0
+            time.sleep(GOLD_ACTION_DELAY)
+            return GoldState.RUDNIK_TAB
 
         # 2. Целевой не виден — определяем направление по любому видимому уровню
         found_level, _ = get_list_level(screen_cv, region)
