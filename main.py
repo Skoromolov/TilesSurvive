@@ -9,6 +9,7 @@ Heal and Raid Bot - Основной скрипт
 import time
 import os
 import win32gui
+import pyautogui
 
 from config import *
 from utils import *
@@ -45,8 +46,9 @@ def main():
 
     raid_start_time = None
     raid_joined_at_least_once = False
-    last_join_time = time.time()
-
+    raid_nav_grace_until = 0
+    raid_start_time = None
+    raid_terminal_since = None
     gold_start_time = None
 
     while True:
@@ -187,6 +189,26 @@ def main():
                 last_raid_state, last_join_time, raid_joined_at_least_once = process_raid(
                     screen_cv, region, last_raid_state, last_join_time, raid_joined_at_least_once, window
                 )
+
+                # Защита от зависания в NO_FREE_SPACE / NO_REIDS
+                terminal_states = (RaidState.NO_FREE_SPACE, RaidState.NO_REIDS, RaidState.RAID_COMPLETED)
+                if last_raid_state in terminal_states:
+                    if raid_terminal_since is None:
+                        raid_terminal_since = time.time()
+                    elif time.time() - raid_terminal_since > 30:
+                        print("[MAIN] RAID застрял в терминальном состоянии > 30 сек. Клик по центру и возврат к HEAL.")
+                        center_x = region[0] + region[2] // 2
+                        center_y = region[1] + region[3] // 2
+                        pyautogui.click(center_x, center_y)
+                        time.sleep(0.5)
+                        current_mode = MainMode.HEAL
+                        last_raid_state = None
+                        raid_start_time = None
+                        raid_joined_at_least_once = False
+                        raid_terminal_since = None
+                        continue
+                else:
+                    raid_terminal_since = None
 
                 # Если все рейды завершены — возвращаемся к лечению
                 if last_raid_state == RaidState.RAID_COMPLETED:
