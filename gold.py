@@ -395,10 +395,27 @@ def process_gold(screen_cv, region, last_gold_state, window):
     # ---- GO / WORK / GRIND ----
     if current_state == GoldState.GO_VISIBLE:
         find_and_click(GOLD_GO_IMG, screen_cv, region)
-        start_gold_mission()
-        update_gold_time()
-        print("[GOLD] ✓ Золотодобыча запущена!")
-        return GoldState.COMPLETED
+        time.sleep(0.5)
+
+        # Проверяем, что рудник действительно занят
+        screen_after = capture_window(region)
+        return_coords, _ = find_on_screen(get_template(GOLD_RETURN_IMG), screen_after, region)
+        my_rudnik_coords, _ = find_on_screen(get_template(GOLD_MY_RUDNIK_IMG), screen_after, region)
+        find_coords, _ = find_on_screen(get_template(GOLD_FIND_IMG), screen_after, region)
+
+        if return_coords or my_rudnik_coords:
+            if find_coords is None:
+                start_gold_mission()
+                update_gold_time()
+                print("[GOLD] ✓ Золотодобыча запущена!")
+                return GoldState.COMPLETED
+            else:
+                print("[GOLD] Кнопка поиска всё ещё видна — рудник не занят. Продолжаем поиск.")
+        else:
+            print("[GOLD] Рудник не занят (нет return.png / my_rudnik.png). Продолжаем поиск.")
+
+        _gold_ctx['expected'] = 'rudnik_tab'
+        return GoldState.RUDNIK_TAB
 
     if current_state == GoldState.WORK_VISIBLE:
         find_and_click(GOLD_WORK_IMG, screen_cv, region)
