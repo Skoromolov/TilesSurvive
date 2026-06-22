@@ -354,6 +354,11 @@ def process_gold(screen_cv, region, last_gold_state, window):
         elif current == GOLD_LEVEL:
             _gold_ctx['need_level_check'] = False
             print(f"[GOLD] Уровень проверен: {current}. Продолжаем добычу.")
+        else:
+            # Текущий уровень не распознался — нельзя начинать добычу вслепую
+            print("[GOLD] Не удалось распознать текущий уровень. Возвращаемся к руднику для проверки.")
+            find_and_click(BACK_IMG, screen_cv, region)
+            return GoldState.UNKNOWN
 
     # ---- GO / WORK / GRIND ----
     if current_state == GoldState.GO_VISIBLE:
