@@ -51,6 +51,7 @@ def main():
     raid_terminal_since = None
     gold_start_time = None
     gold_exit_state = None
+    gold_exiting = False
 
     while True:
         try:
@@ -148,13 +149,14 @@ def main():
                     last_gold_state = current_gold_state
 
                 # Обработать одно состояние
-                current_gold_state = determine_gold_state(screen_cv, region)
-                if current_gold_state != last_gold_state:
-                    if current_gold_state.value:
-                        print(f"[MAIN] GOLD: {current_gold_state.value}")
-                    else:
-                        print(f"[MAIN] GOLD: {current_gold_state}")
-                last_gold_state = process_gold(screen_cv, region, last_gold_state, window)
+                if not gold_exiting:
+                    current_gold_state = determine_gold_state(screen_cv, region)
+                    if current_gold_state != last_gold_state:
+                        if current_gold_state.value:
+                            print(f"[MAIN] GOLD: {current_gold_state.value}")
+                        else:
+                            print(f"[MAIN] GOLD: {current_gold_state}")
+                    last_gold_state = process_gold(screen_cv, region, last_gold_state, window)
 
                 # Если добыча завершена — выходим
                 if last_gold_state == GoldState.COMPLETED:
@@ -162,6 +164,7 @@ def main():
                     if gold_exit_state != GoldState.COMPLETED:
                         if gold_exit_state is None:
                             gold_exit_state = last_gold_state
+                        gold_exiting = True
                         print("[MAIN] Золотодобыча завершена, выходим из окна золота")
                         gold_exit_state = process_gold_exit(screen_cv, region, gold_exit_state, window)
                         if gold_exit_state == GoldState.COMPLETED:
@@ -170,6 +173,7 @@ def main():
                             last_gold_state = None
                             gold_exit_state = None
                             gold_start_time = None
+                            gold_exiting = False
                         continue
                     else:
                         print("[MAIN] Золотодобыча завершена, возврат к лечению")
@@ -177,6 +181,7 @@ def main():
                         last_gold_state = None
                         gold_exit_state = None
                         gold_start_time = None
+                        gold_exiting = False
                         continue
 
             # Режим RAID
