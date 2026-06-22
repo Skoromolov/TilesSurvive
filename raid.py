@@ -237,20 +237,24 @@ def process_raid(screen_cv, region, last_raid_state, last_join_time, raid_joined
         return None, last_join_time, raid_joined_at_least_once
 
     if current_state == RaidState.NO_FREE_SPACE:
-        find_and_click(RAID_OK_IMG, screen_cv, region)
-        return last_raid_state, time.time(), raid_joined_at_least_once
+        clicked, _ = find_and_click(RAID_OK_IMG, screen_cv, region)
+        if not clicked:
+            find_and_click(BACK_IMG, screen_cv, region)
+            find_and_click(CLOSE_IMG, screen_cv, region)
+        time.sleep(0.5)
+        return RaidState.RAID_COMPLETED, time.time(), raid_joined_at_least_once
 
     if current_state == RaidState.RAID_FULL:
         find_and_click(RAID_OK_IMG, screen_cv, region)
-        # После закрытия окна считаем, что мест нет
-        return RaidState.NO_FREE_SPACE, time.time(), raid_joined_at_least_once
+        time.sleep(0.5)
+        return RaidState.RAID_COMPLETED, time.time(), raid_joined_at_least_once
 
     if current_state == RaidState.NO_REIDS:
         village_coords, _ = find_on_screen(get_template(VILLAGE_IMG), screen_cv, region)
         if village_coords:
             navigate_to_reid_window()
             return None, last_join_time, raid_joined_at_least_once
-        return last_raid_state, time.time(), raid_joined_at_least_once
+        return RaidState.NO_REIDS, time.time(), raid_joined_at_least_once
 
     if current_state == RaidState.NEEDS_SCROLL:
         check_and_scroll_for_attack(screen_cv, region)
