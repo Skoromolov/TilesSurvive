@@ -112,6 +112,7 @@ GOLD_MOVEON_IMG = FOLDER + FOLDER_GOLD + 'moveOn.png'
 GOLD_FINISH_IMG = FOLDER + FOLDER_GOLD + 'finish.png'
 GOLD_CONFIRM_IMG = FOLDER + FOLDER_GOLD + 'confirm.png'
 GOLD_SUMMARY_STRENGTH_TEXT_IMG = FOLDER + FOLDER_GOLD + 'summary_strength_text.png'
+GOLD_JOIN_IMG = FOLDER + FOLDER_GOLD + 'join.png'
 GOLD_HAND_IMG = FOLDER + FOLDER_GOLD + 'hand.png'
 
 # ==========================================

@@ -375,6 +375,28 @@ def process_gold(screen_cv, region, last_gold_state, window):
 
     # ---- SUMMARY STRENGTH TEXT POPUP ----
     if current_state == GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE:
+        # Сначала ищем кнопку присоединения/атаки внутри попапа
+        join_coords, _ = find_on_screen(get_template(GOLD_JOIN_IMG), screen_cv, region)
+        if join_coords:
+            print("[GOLD] Найдена кнопка присоединения/атаки. Нажимаем.")
+            find_and_click(GOLD_JOIN_IMG, screen_cv, region)
+            time.sleep(0.5)
+
+            screen_after = capture_window(region)
+            return_coords, _ = find_on_screen(get_template(GOLD_RETURN_IMG), screen_after, region)
+            my_rudnik_coords, _ = find_on_screen(get_template(GOLD_MY_RUDNIK_IMG), screen_after, region)
+
+            if return_coords or my_rudnik_coords:
+                start_gold_mission()
+                update_gold_time()
+                print("[GOLD] ✓ Золотодобыча запущена через присоединение!")
+                return GoldState.COMPLETED
+            else:
+                print("[GOLD] Присоединение не подтвердилось. Продолжаем поиск.")
+                _gold_ctx['expected'] = 'rudnik_tab'
+                return GoldState.RUDNIK_TAB
+
+        # Иначе просто закрываем попап
         print("[GOLD] Место занято (SummaryStrenghtText). Закрываем попап.")
         find_and_click(CLOSE_IMG, screen_cv, region)
         _gold_ctx['expected'] = 'rudnik_tab'
