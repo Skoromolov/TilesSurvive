@@ -20,11 +20,10 @@ _gold_ctx = {
     'level_select_scroll_tries': 0,
     'stuck_count': 0,
     'stuck_last_action': None,
-    'started_at': None,        # timestamp запуска добычи
-    'current_mining_level': None,
+    'events_clicked_at': None,
+    'moveon_clicked_at': None,
     'recall_requested': False,
     'need_level_check': False, # флаг: нужно убедиться, что мы на целевом уровне
-    'moveon_clicked_at': None, # timestamp последнего клика moveOn
 }
 
 
@@ -97,8 +96,7 @@ def reset_gold_context():
     _gold_ctx['stuck_last_action'] = None
     _gold_ctx['raid_icon_clicks'] = 0
     _gold_ctx['need_level_check'] = False
-    _gold_ctx['moveon_clicked_at'] = None
-
+    _gold_ctx['recall_requested'] = False
 
 # ==========================================
 # ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ УРОВНЕЙ
@@ -586,7 +584,8 @@ def process_gold(screen_cv, region, last_gold_state, window):
     if current_state == GoldState.MAIN_SCREEN:
         find_and_click(EVENTS_IMG, screen_cv, region)
         _gold_ctx['swipe_count'] = 0
-        time.sleep(0.5)
+        _gold_ctx['events_clicked_at'] = time.time()
+        time.sleep(1.0)
         _gold_ctx['expected'] = 'events'
         return GoldState.EVENTS_OPEN
 
@@ -598,6 +597,13 @@ def process_gold(screen_cv, region, last_gold_state, window):
         if clicked_at and (time.time() - clicked_at) < 2.0:
             print("[GOLD] Ожидаем завершения перехода после клика 'Перейти'.")
             _gold_ctx['moveon_clicked_at'] = None
+            time.sleep(GOLD_ACTION_DELAY)
+            return GoldState.UNKNOWN
+
+        clicked_events_at = _gold_ctx.get('events_clicked_at')
+        if clicked_events_at and (time.time() - clicked_events_at) < 2.5:
+            print("[GOLD] Ожидаем открытия меню событий.")
+            _gold_ctx['events_clicked_at'] = None
             time.sleep(GOLD_ACTION_DELAY)
             return GoldState.UNKNOWN
 
