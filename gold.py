@@ -392,7 +392,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
 
         # Иначе просто закрываем попап
         print("[GOLD] Место занято (SummaryStrenghtText). Закрываем попап.")
-        find_and_click(CLOSE_IMG, screen_cv, region)
+        find_and_click(GOLD_CLOSE_IMG, screen_cv, region)
         _gold_ctx['expected'] = 'rudnik_tab'
         return GoldState.RUDNIK_TAB
 
@@ -417,7 +417,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
         else:
             # Текущий уровень не виден на экране поиска/добычи — закрываем его, чтобы увидеть current_lvl_X
             print("[GOLD] Текущий уровень не виден на экране добычи. Закрываем окно для проверки.")
-            find_and_click(CLOSE_IMG, screen_cv, region)
+            find_and_click(GOLD_CLOSE_IMG, screen_cv, region)
             return GoldState.UNKNOWN
 
     # ---- GO / WORK / GRIND ----
@@ -452,7 +452,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
         go_coords, _ = find_on_screen(get_template(GOLD_GO_IMG), screen_after, region)
         if work_coords or go_coords:
             print("[GOLD] Застряли в попапе (видны work/go). Закрываем.")
-            find_and_click(CLOSE_IMG, screen_after, region)
+            find_and_click(GOLD_CLOSE_IMG, screen_after, region)
 
         _gold_ctx['expected'] = 'rudnik_tab'
         return GoldState.RUDNIK_TAB
@@ -515,7 +515,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
         find_test, _ = find_on_screen(get_template(GOLD_FIND_IMG), screen_cv, region)
         if find_test is None and current is not None:
             print("[GOLD] Виден уровень, но нет кнопки поиска. Закрываем попап.")
-            find_and_click(CLOSE_IMG, screen_cv, region)
+            find_and_click(GOLD_CLOSE_IMG, screen_cv, region)
             return GoldState.UNKNOWN
 
         if current is not None and current != GOLD_LEVEL:
@@ -635,7 +635,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
             find_and_click(BACK_IMG, screen_cv, region)
             _gold_ctx['stuck_last_action'] = 'back'
         elif action != 'close':
-            find_and_click(CLOSE_IMG, screen_cv, region)
+            find_and_click(GOLD_CLOSE_IMG, screen_cv, region)
             _gold_ctx['stuck_last_action'] = 'close'
         else:
             find_and_click(VILLAGE_IMG, screen_cv, region)

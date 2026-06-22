@@ -58,10 +58,11 @@ VILLAGE_IMG = FOLDER + FOLDER_COMMON + 'village.png'
 WILD_EARTH_IMG = FOLDER + FOLDER_COMMON + 'wild_earth.png'
 CLOSE_IMG = FOLDER + FOLDER_COMMON + 'close.png'
 BACK_IMG = FOLDER + FOLDER_COMMON + 'back.png'
-EVENTS_IMG = FOLDER + FOLDER_COMMON + 'events.png'
+HELP_HANDS_IMG = FOLDER + FOLDER_COMMON + 'help_hands.png'
+GOLD_CLOSE_IMG = FOLDER + FOLDER_GOLD + 'close.png'  # кнопка закрытия попапов внутри золотодобычи
 
-# Элементы лечения
-HEAL_TOWN_IMG = FOLDER + FOLDER_HEAL + 'heal_town.png'
+# Gold
+GOLD_FOLDER = FOLDER + FOLDER_GOLD
 HEAL_BUTTON_IMG = FOLDER + FOLDER_HEAL + 'heal_button.png'
 HEAL_WAIT_IMG = FOLDER + FOLDER_HEAL + 'heal_wait.png'
 HEAL_HELP_HANDS_IMG = FOLDER + FOLDER_HEAL + 'heal_help_hands.png'
