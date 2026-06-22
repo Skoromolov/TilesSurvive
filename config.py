@@ -38,8 +38,8 @@ GOLD_LEVEL = 1                # Уровень рудника 1-6, на кото
 GOLD_MINING_DURATION = 2700   # 45 минут = 2700 сек; по прошествии отзываем отряд
 GOLD_SEARCH_TIMEOUT = 60      # Таймаут поиска рудника в секундах
 GOLD_TIMEOUT = 300            # Таймаут всего процесса золотодобычи (5 минут)
-GOLD_LEVEL_CONFIDENCE_THRESHOLD = 0.85  # Высокий порог для current_lvl_X, выбираем по max conf
-GOLD_LIST_LEVEL_CONFIDENCE_THRESHOLD = 0.80  # Порог для lvl_X в списке
+GOLD_LEVEL_CONFIDENCE_THRESHOLD = 0.95  # Высокий порог для current_lvl_X, выбираем по max conf
+GOLD_LIST_LEVEL_CONFIDENCE_THRESHOLD = 0.90  # Порог для lvl_X в списке
 
 # ==========================================
 # КОНСТАНТЫ ИЗОБРАЖЕНИЙ
@@ -201,3 +201,4 @@ class GoldState(Enum):
     RECONNECT_REPEAT_POPUP = "reconnect_repeat_popup"
     FREE_PLACE_VISIBLE = "free_place_visible"
     COMPLETED = "completed"
+    RETURN_BUTTON_VISIBLE = "return_button_visible"

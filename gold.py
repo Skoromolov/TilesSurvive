@@ -172,7 +172,12 @@ def determine_gold_state(screen_cv, region):
     if coords:
         return GoldState.RETURN_CONFIRM_VISIBLE
 
-    # 3. Цепочка добычи / марш
+    # 3. Кнопка "Отозвать" на экране рудника — отряд уже добывает на этом уровне
+    coords, _ = find_on_screen(get_template(GOLD_RETURN_IMG), screen_cv, region)
+    if coords:
+        return GoldState.RETURN_BUTTON_VISIBLE
+
+    # 4. Цепочка добычи / марш
     coords, _ = find_on_screen(get_template(GOLD_GO_IMG), screen_cv, region)
     if coords:
         return GoldState.GO_VISIBLE
@@ -185,13 +190,12 @@ def determine_gold_state(screen_cv, region):
     if coords:
         return GoldState.GRIND_VISIBLE
 
-    # 4. Свободное место после поиска
+    # 5. Свободное место после поиска
     coords, _ = find_on_screen(get_template(GOLD_FREE_PLACE_IMG), screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
     if coords:
         return GoldState.FREE_PLACE_VISIBLE
 
-    # 5. Открыта таба рудника (виджет уровня / select_level) — приоритет выше,
-    #    чем у иконки активной добычи, чтобы случайный UI-указатель не мешал.
+    # 6. Открыта таба рудника (виджет уровня / select_level)
     current_level = get_current_level(screen_cv, region)
     if current_level is not None:
         return GoldState.RUDNIK_TAB
@@ -200,19 +204,17 @@ def determine_gold_state(screen_cv, region):
     if coords:
         return GoldState.RUDNIK_TAB
 
-    # 6. Мой рудник (отряд уже добывает)
+    # 7. Мой рудник (отряд уже добывает)
     coords, _ = find_on_screen(get_template(GOLD_MY_RUDNIK_IMG), screen_cv, region)
     if coords:
         return GoldState.MY_RUDNIK_VISIBLE
 
-    # 7. Иконка активного уровня добычи (кликабельная).
-    #    Используется как вспомогательный признак, только если не определились
-    #    RUDNIK_TAB/MY_RUDNIK_VISIBLE.
+    # 8. Иконка активного уровня добычи (кликабельная)
     coords, _ = find_on_screen(get_template(GOLD_CURRENT_RAID_LEVEL_ICON_IMG), screen_cv, region)
     if coords:
         return GoldState.RAID_LEVEL_ICON_VISIBLE
 
-    # 8. Список уровней
+    # 9. Список уровней
     coords, _ = find_on_screen(get_template(GOLD_SELECT_LEVEL_IMG), screen_cv, region)
     if coords:
         # Если мы целенаправленно открыли список — считаем это списком уровней
@@ -220,19 +222,19 @@ def determine_gold_state(screen_cv, region):
             return GoldState.LEVEL_LIST_VISIBLE
         return GoldState.SELECT_LEVEL_VISIBLE
 
-    # 9. Меню событий — иконка рудника
+    # 10. Меню событий — иконка рудника
     coords, _ = find_on_screen(get_template(GOLD_RUDNIK_IMG), screen_cv, region)
     if coords:
         return GoldState.EVENTS_OPEN
 
-    # 10. Главный экран / меню событий без видимого рудника
+    # 11. Главный экран / меню событий без видимого рудника
     coords, _ = find_on_screen(get_template(EVENTS_IMG), screen_cv, region)
     if coords:
         if _gold_ctx.get('expected') in ('events', 'events_scroll'):
             return GoldState.EVENTS_NEED_SCROLL
         return GoldState.MAIN_SCREEN
 
-    # 11. Признаки поселения / карты
+    # 12. Признаки поселения / карты
     coords, _ = find_on_screen(get_template(VILLAGE_IMG), screen_cv, region)
     if coords:
         return GoldState.MAIN_SCREEN
@@ -266,13 +268,20 @@ def process_gold(screen_cv, region, last_gold_state, window):
         handle_reconnect_repeat(screen_cv, region)
         return GoldState.UNKNOWN
 
+    # ---- RETURN BUTTON ----
+    if current_state == GoldState.RETURN_BUTTON_VISIBLE:
+        print("[GOLD] Отряд занят добычей на этом уровне. Отзываем.")
+        find_and_click(GOLD_RETURN_IMG, screen_cv, region)
+        _gold_ctx['recall_requested'] = True
+        return GoldState.RETURN_CONFIRM_VISIBLE
+
     # ---- RETURN CONFIRM ----
     if current_state == GoldState.RETURN_CONFIRM_VISIBLE:
         find_and_click(GOLD_RETURN_BOYS_IMG, screen_cv, region)
         clear_gold_mission()
-        _gold_ctx['expected'] = 'find'
+        _gold_ctx['expected'] = 'rudnik_tab'
         print("[GOLD] Отряд отозван.")
-        return GoldState.FIND_VISIBLE
+        return GoldState.RUDNIK_TAB
 
     # ---- GO / WORK / GRIND ----
     if current_state == GoldState.GO_VISIBLE:
@@ -455,6 +464,7 @@ def process_gold_exit(screen_cv, region, last_exit_state, window):
         GoldState.MY_RUDNIK_VISIBLE,
         GoldState.RAID_LEVEL_ICON_VISIBLE,
         GoldState.RETURN_CONFIRM_VISIBLE,
+        GoldState.RETURN_BUTTON_VISIBLE,
         GoldState.FREE_PLACE_VISIBLE,
     ):
         find_and_click(BACK_IMG, screen_cv, region)
