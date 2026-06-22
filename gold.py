@@ -94,26 +94,39 @@ def reset_gold_context():
 # ==========================================
 # ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ УРОВНЕЙ
 # ==========================================
-def get_current_level(screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD):
+def get_current_level(screen_cv, region, threshold=GOLD_LEVEL_CONFIDENCE_THRESHOLD):
     """Определить текущий открытый уровень рудника по current_lvl_X."""
+    best_level = None
+    best_conf = 0.0
     for level in range(1, 7):
-        coords, conf = find_on_screen(get_template(GOLD_CURRENT_LEVEL_IMAGES[level]), screen_cv, region, threshold)
-        if coords:
-            print(f"[GOLD] Распознан текущий уровень: {level} (conf={conf:.3f})")
-            return level
-    return None
+        coords, conf = find_on_screen(
+            get_template(GOLD_CURRENT_LEVEL_IMAGES[level]), screen_cv, region, threshold
+        )
+        if coords and conf > best_conf:
+            best_conf = conf
+            best_level = level
+    if best_level:
+        print(f"[GOLD] Распознан текущий уровень: {best_level} (conf={best_conf:.3f})")
+    return best_level
 
 
-def get_list_level(screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD):
+def get_list_level(screen_cv, region, threshold=GOLD_LIST_LEVEL_CONFIDENCE_THRESHOLD):
     """Найти уровень в списке выбора уровней. Возвращает (level, center_coords) или (None, None)."""
+    best_level = None
+    best_coords = None
+    best_conf = 0.0
     for level in range(1, 7):
         template = get_template(GOLD_LEVEL_IMAGES[level])
         if template is None:
             continue
         coords, conf = find_on_screen(template, screen_cv, region, threshold)
-        if coords:
-            print(f"[GOLD] В списке найден уровень {level} (conf={conf:.3f})")
-            return level, coords
+        if coords and conf > best_conf:
+            best_conf = conf
+            best_level = level
+            best_coords = coords
+    if best_level:
+        print(f"[GOLD] В списке найден уровень {best_level} (conf={best_conf:.3f})")
+        return best_level, best_coords
     return None, None
 
 
