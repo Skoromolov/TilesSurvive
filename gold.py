@@ -681,25 +681,30 @@ def process_gold_exit(screen_cv, region, last_exit_state, window):
     if current_state in (GoldState.MAIN_SCREEN,):
         return GoldState.COMPLETED
 
-    if current_state in (
-        GoldState.GO_VISIBLE,
-        GoldState.WORK_VISIBLE,
-        GoldState.GRIND_VISIBLE,
-        GoldState.FIND_VISIBLE,
-        GoldState.RUDNIK_TAB,
-        GoldState.SELECT_LEVEL_VISIBLE,
-        GoldState.LEVEL_LIST_VISIBLE,
-        GoldState.EVENTS_OPEN,
-        GoldState.EVENTS_NEED_SCROLL,
-        GoldState.MY_RUDNIK_VISIBLE,
-        GoldState.RAID_LEVEL_ICON_VISIBLE,
-        GoldState.RETURN_CONFIRM_VISIBLE,
-        GoldState.RETURN_BUTTON_VISIBLE,
-        GoldState.FINISH_VISIBLE,
-        GoldState.CONFIRM_VISIBLE,
-        GoldState.FREE_PLACE_VISIBLE,
-    ):
-        find_and_click(BACK_IMG, screen_cv, region)
+    # Счётчик попыток выхода храним в контексте
+    _gold_ctx['exit_attempts'] = _gold_ctx.get('exit_attempts', 0) + 1
+    attempts = _gold_ctx['exit_attempts']
+
+    # Последовательность закрытия: village -> back -> close -> клик по центру
+    if attempts % 4 == 1:
+        if find_and_click(VILLAGE_IMG, screen_cv, region)[0]:
+            time.sleep(0.3)
+            return current_state
+    elif attempts % 4 == 2:
+        if find_and_click(BACK_IMG, screen_cv, region)[0]:
+            time.sleep(0.3)
+            return current_state
+    elif attempts % 4 == 3:
+        if find_and_click(GOLD_CLOSE_IMG, screen_cv, region)[0]:
+            time.sleep(0.3)
+            return current_state
+    else:
+        # Клик по центру экрана как последняя мера
+        center_x = region[0] + region[2] // 2
+        center_y = region[1] + region[3] // 2
+        print(f"[GOLD EXIT] Клик по центру экрана ({center_x}, {center_y}) для сброса UI.")
+        pyautogui.click(center_x, center_y)
+        time.sleep(0.5)
         return current_state
 
     if current_state in (GoldState.UNKNOWN,):
