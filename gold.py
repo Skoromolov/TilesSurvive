@@ -642,14 +642,6 @@ def process_gold(screen_cv, region, last_gold_state, window):
             _gold_ctx['stuck_last_action'] = None
             _gold_ctx['stuck_count'] = 0
 
-        # Если застряли слишком долго — пробуем Escape
-        if _gold_ctx['stuck_count'] > 5:
-            print("[GOLD] Пробуем нажать Escape для закрытия попапа.")
-            pyautogui.keyDown('esc')
-            pyautogui.keyUp('esc')
-            _gold_ctx['stuck_count'] = 0
-            _gold_ctx['stuck_last_action'] = None
-
         time.sleep(0.1)
         return GoldState.UNKNOWN
 
