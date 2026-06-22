@@ -523,11 +523,10 @@ def process_gold(screen_cv, region, last_gold_state, window):
                 find_and_click(GOLD_SELECT_LEVEL_IMG, screen_cv, region)
                 time.sleep(0.3)
                 return GoldState.RUDNIK_TAB
-            # Иначе это какой-то другой попап
-            if current is not None:
-                print("[GOLD] Виден уровень, но нет кнопки поиска. Закрываем попап.")
-                find_and_click(GOLD_CLOSE_IMG, screen_cv, region)
-                return GoldState.UNKNOWN
+            # Иначе это какой-то другой попап/экран
+            print("[GOLD] На вкладке рудника нет кнопки поиска. Закрываем попап.")
+            find_and_click(GOLD_CLOSE_IMG, screen_cv, region)
+            return GoldState.UNKNOWN
 
         if current is not None and current != GOLD_LEVEL:
             _gold_ctx['need_level_check'] = True
