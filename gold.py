@@ -342,7 +342,10 @@ def process_gold(screen_cv, region, last_gold_state, window):
     # ---- ПРОВЕРКА ЦЕЛЕВОГО УРОВНЯ ПЕРЕД ДОБЫЧЕЙ ----
     # После отзыва/подтверждения обязательно проверяем, что мы на нужном уровне,
     # прежде чем нажимать find / free_place / grind / work / go.
-    if _gold_ctx.get('need_level_check'):
+    if _gold_ctx.get('need_level_check') and current_state in (
+        GoldState.FIND_VISIBLE, GoldState.FREE_PLACE_VISIBLE,
+        GoldState.GRIND_VISIBLE, GoldState.WORK_VISIBLE, GoldState.GO_VISIBLE
+    ):
         current = get_current_level(screen_cv, region)
         if current is not None and current != GOLD_LEVEL:
             print(f"[GOLD] Уровень {current}, нужен {GOLD_LEVEL}. Открываем выбор уровня перед добычей.")
@@ -355,9 +358,9 @@ def process_gold(screen_cv, region, last_gold_state, window):
             _gold_ctx['need_level_check'] = False
             print(f"[GOLD] Уровень проверен: {current}. Продолжаем добычу.")
         else:
-            # Текущий уровень не распознался — нельзя начинать добычу вслепую
-            print("[GOLD] Не удалось распознать текущий уровень. Возвращаемся к руднику для проверки.")
-            find_and_click(BACK_IMG, screen_cv, region)
+            # Текущий уровень не виден на экране поиска/добычи — закрываем его, чтобы увидеть current_lvl_X
+            print("[GOLD] Текущий уровень не виден на экране добычи. Закрываем окно для проверки.")
+            find_and_click(CLOSE_IMG, screen_cv, region)
             return GoldState.UNKNOWN
 
     # ---- GO / WORK / GRIND ----
