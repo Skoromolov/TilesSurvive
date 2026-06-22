@@ -12,7 +12,7 @@ from utils import *
 # ==========================================
 # ПЕРЕМЕННЫЕ СОСТОЯНИЯ ЗОЛОТА
 # ==========================================
-last_gold_time = 0
+last_gold_time = time.time()  # инициализируем текущим временем, чтобы не стартовать с 1970 года
 _gold_ctx = {
     'expected': None,          # подсказка для неоднозначных состояний
     'swipe_count': 0,
@@ -581,6 +581,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
     if current_state == GoldState.MAIN_SCREEN:
         find_and_click(EVENTS_IMG, screen_cv, region)
         _gold_ctx['swipe_count'] = 0
+        time.sleep(0.5)
         _gold_ctx['expected'] = 'events'
         return GoldState.EVENTS_OPEN
 
