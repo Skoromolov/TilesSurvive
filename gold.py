@@ -513,12 +513,21 @@ def process_gold(screen_cv, region, last_gold_state, window):
         _gold_ctx['expected'] = 'rudnik_tab'
         current = get_current_level(screen_cv, region)
 
-        # Если мы не на настоящей вкладке рудника (нет кнопки поиска) — закрываем попап/окно
+        # Если мы не на настоящей вкладке рудника (нет кнопки поиска)
         find_test, _ = find_on_screen(get_template(GOLD_FIND_IMG), screen_cv, region)
-        if find_test is None and current is not None:
-            print("[GOLD] Виден уровень, но нет кнопки поиска. Закрываем попап.")
-            find_and_click(GOLD_CLOSE_IMG, screen_cv, region)
-            return GoldState.UNKNOWN
+        select_test, _ = find_on_screen(get_template(GOLD_SELECT_LEVEL_IMG), screen_cv, region)
+        if find_test is None:
+            if select_test is not None and current is not None:
+                # Список уровней открыт поверх рудника — закрываем его
+                print("[GOLD] Список уровней открыт, кнопка поиска скрыта. Закрываем список.")
+                find_and_click(GOLD_SELECT_LEVEL_IMG, screen_cv, region)
+                time.sleep(0.3)
+                return GoldState.RUDNIK_TAB
+            # Иначе это какой-то другой попап
+            if current is not None:
+                print("[GOLD] Виден уровень, но нет кнопки поиска. Закрываем попап.")
+                find_and_click(GOLD_CLOSE_IMG, screen_cv, region)
+                return GoldState.UNKNOWN
 
         if current is not None and current != GOLD_LEVEL:
             _gold_ctx['need_level_check'] = True
