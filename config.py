@@ -64,11 +64,14 @@ GOLD_CLOSE_IMG = FOLDER + FOLDER_GOLD + 'close.png'  # кнопка закрыт
 
 # Gold
 GOLD_FOLDER = FOLDER + FOLDER_GOLD
-HEAL_BUTTON_IMG = FOLDER + FOLDER_HEAL + 'heal_button.png'
-HEAL_WAIT_IMG = FOLDER + FOLDER_HEAL + 'heal_wait.png'
+
+# Heal
+HEAL_TOWN_IMG = FOLDER + FOLDER_HEAL + 'heal_town.png'
+HEAL_BUTTON_IMG  = FOLDER + FOLDER_HEAL + 'heal_button.png'
+HEAL_WAIT_IMG    = FOLDER + FOLDER_HEAL + 'heal_wait.png'
 HEAL_HELP_HANDS_IMG = FOLDER + FOLDER_HEAL + 'heal_help_hands.png'
-HEAL_FREE_BUTTON_IMG = FOLDER + FOLDER_HEAL + 'heal_free_button.png'
-FAST_USE_IMG = FOLDER + FOLDER_HEAL + 'fast_use.png'
+HEAL_FREE_BUTTON_IMG  = FOLDER + FOLDER_HEAL + 'heal_free_button.png'
+FAST_USE_IMG     = FOLDER + FOLDER_HEAL + 'fast_use.png'
 
 # Элементы быстрого лечения с карты мира
 AMBULANCE_ON_MAP_IMG = FOLDER + FOLDER_HEAL + 'ambulance.png'
