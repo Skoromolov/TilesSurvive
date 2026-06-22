@@ -130,25 +130,45 @@ def get_list_level(screen_cv, region, threshold=GOLD_LIST_LEVEL_CONFIDENCE_THRES
     return None, None
 
 
-def click_level_go_button(level_path, screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD):
+def find_target_level_in_list(screen_cv, region, target=GOLD_LEVEL, threshold=GOLD_LIST_LEVEL_CONFIDENCE_THRESHOLD):
+    """Искать в списке только целевой уровень. Возвращает (center_coords, conf) или (None, 0)."""
+    target_path = GOLD_LEVEL_IMAGES[target]
+    template = get_template(target_path)
+    if template is None:
+        return None, 0.0
+    coords, conf = find_on_screen(template, screen_cv, region, threshold)
+    if coords:
+        print(f"[GOLD] Целевой уровень {target} найден в списке (conf={conf:.3f})")
+    return coords, conf
+
+
+def click_level_go_button(level_path, screen_cv, region, coords=None, threshold=CONFIDENCE_MEDIUM_THRESHOLD):
     """
     Кликнуть по кнопке 'Перейти' внутри карточки lvl_X.png.
-    Шаблон lvl_X содержит всю карточку; кнопка находится в нижней части.
+    Если переданы coords (центр найденного lvl_X), кликаем в нижней части этой же карточки.
     """
     template = get_template(level_path)
     if template is None:
         return False
 
-    res = cv2.matchTemplate(screen_cv, template, cv2.TM_CCOEFF_NORMED)
-    _, max_val, _, max_loc = cv2.minMaxLoc(res)
-    if max_val < threshold:
-        return False
+    if coords is None:
+        res = cv2.matchTemplate(screen_cv, template, cv2.TM_CCOEFF_NORMED)
+        _, max_val, _, max_loc = cv2.minMaxLoc(res)
+        if max_val < threshold:
+            return False
+        h, w = template.shape[:2]
+        click_x = region[0] + max_loc[0] + w / 2
+        click_y = region[1] + max_loc[1] + h * 0.85
+    else:
+        h, w = template.shape[:2]
+        click_x = coords[0]
+        click_y = coords[1] + h * 0.35
+        max_val = None
 
-    h, w = template.shape[:2]
-    click_x = region[0] + max_loc[0] + w / 2
-    click_y = region[1] + max_loc[1] + h * 0.85
     pyautogui.click(click_x, click_y)
-    print(f"[GOLD] Нажата 'Перейти' для целевого уровня ({click_x:.0f}, {click_y:.0f}) conf={max_val:.3f}")
+    print(f"[GOLD] Нажата 'Перейти' для целевого уровня ({click_x:.0f}, {click_y:.0f})")
+    if max_val is not None:
+        print(f"[GOLD] conf={max_val:.3f}")
     return True
 
 
@@ -386,17 +406,21 @@ def process_gold(screen_cv, region, last_gold_state, window):
     if current_state in (GoldState.SELECT_LEVEL_VISIBLE, GoldState.LEVEL_LIST_VISIBLE) \
             or _gold_ctx.get('expected') == 'level_list':
         target_path = GOLD_LEVEL_IMAGES[GOLD_LEVEL]
-        found_level, _ = get_list_level(screen_cv, region)
 
-        if found_level == GOLD_LEVEL:
-            if click_level_go_button(target_path, screen_cv, region):
+        # 1. Ищем ТОЛЬКО целевой уровень
+        target_coords, target_conf = find_target_level_in_list(screen_cv, region)
+        if target_coords:
+            if click_level_go_button(target_path, screen_cv, region, coords=target_coords):
                 _gold_ctx['expected'] = 'rudnik_tab'
                 _gold_ctx['level_select_scroll_tries'] = 0
+                time.sleep(GOLD_ACTION_DELAY)
                 return GoldState.RUDNIK_TAB
 
-        # Прокрутка списка мелким шагом: один свайп → скриншот → поиск
+        # 2. Целевой не виден — определяем направление по любому видимому уровню
+        found_level, _ = get_list_level(screen_cv, region)
+
         _gold_ctx['level_select_scroll_tries'] = _gold_ctx.get('level_select_scroll_tries', 0) + 1
-        if _gold_ctx['level_select_scroll_tries'] > 15:
+        if _gold_ctx['level_select_scroll_tries'] > 20:
             print("[GOLD] Не удалось найти целевой уровень. Сброс.")
             _gold_ctx['expected'] = None
             _gold_ctx['level_select_scroll_tries'] = 0
@@ -405,21 +429,12 @@ def process_gold(screen_cv, region, last_gold_state, window):
         if found_level is not None:
             if GOLD_LEVEL < found_level:
                 direction = 'up'
-            elif GOLD_LEVEL > found_level:
-                direction = 'down'
             else:
-                # Уровень виден, но кнопка 'Перейти' не нажалась — пробуем ещё раз без скролла
-                print(f"[GOLD] Уровень {GOLD_LEVEL} виден, повторяем клик 'Перейти'.")
-                if click_level_go_button(target_path, screen_cv, region):
-                    _gold_ctx['expected'] = 'rudnik_tab'
-                    _gold_ctx['level_select_scroll_tries'] = 0
-                    return GoldState.RUDNIK_TAB
                 direction = 'down'
         else:
-            # Уровней вообще не видим — идём вверх к 1-му по умолчанию
             direction = 'up'
 
-        scroll_in_region(region, direction, step_ratio=0.15)
+        scroll_in_region(region, direction, step_ratio=0.12)
         return GoldState.LEVEL_LIST_VISIBLE
 
     # ---- FIND (поиск свободного рудника) ----
