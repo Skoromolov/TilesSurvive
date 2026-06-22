@@ -162,7 +162,7 @@ def click_level_go_button(level_path, screen_cv, region, coords=None, threshold=
     else:
         h, w = template.shape[:2]
         click_x = coords[0]
-        click_y = coords[1] + h * 0.35
+        click_y = coords[1] + h * 0.30  # кнопка "Перейти" в нижней части карточки (0.8 от верха)
         max_val = None
 
     pyautogui.click(click_x, click_y)
@@ -395,6 +395,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
             find_and_click(GOLD_SELECT_LEVEL_IMG, screen_cv, region)
             _gold_ctx['expected'] = 'level_list'
             _gold_ctx['level_select_scroll_tries'] = 0
+            time.sleep(GOLD_ACTION_DELAY)
             return GoldState.SELECT_LEVEL_VISIBLE
 
         # Уровень совпадает или не удалось распознать — начинаем поиск
