@@ -132,7 +132,7 @@ def get_list_level(screen_cv, region, threshold=GOLD_LIST_LEVEL_CONFIDENCE_THRES
     return None, None
 
 
-def click_moveon_for_target_level(screen_cv, region, target=GOLD_LEVEL, lvl_threshold=GOLD_LIST_LEVEL_CONFIDENCE_THRESHOLD, btn_threshold=CONFIDENCE_MEDIUM_THRESHOLD):
+def click_moveon_for_target_level(screen_cv, region, target=GOLD_LEVEL, lvl_threshold=GOLD_LIST_LEVEL_CONFIDENCE_THRESHOLD, btn_threshold=0.70):
     """
     Найти кнопку 'Перейти' (moveOn.png), которая расположена под текстом целевого уровня,
     и кликнуть по ней. Обрабатывает дублирующиеся кнопки на экране.
@@ -147,6 +147,7 @@ def click_moveon_for_target_level(screen_cv, region, target=GOLD_LEVEL, lvl_thre
     h_btn, w_btn = btn_template.shape[:2]
     btn_matches = find_all_on_screen(btn_template, screen_cv, region, btn_threshold)
     if not btn_matches:
+        print(f"[GOLD] moveOn.png не найден на экране (threshold={btn_threshold}).")
         return False
 
     # 2. Находим все вхождения текста целевого уровня
@@ -156,6 +157,7 @@ def click_moveon_for_target_level(screen_cv, region, target=GOLD_LEVEL, lvl_thre
     h_lvl, w_lvl = lvl_template.shape[:2]
     lvl_matches = find_all_on_screen(lvl_template, screen_cv, region, lvl_threshold)
     if not lvl_matches:
+        print(f"[GOLD] lvl_{target}.png не найден на экране.")
         return False
 
     # 3. Для каждой кнопки ищем текст уровня, расположенный прямо над ней
@@ -167,16 +169,18 @@ def click_moveon_for_target_level(screen_cv, region, target=GOLD_LEVEL, lvl_thre
             lvl_bottom = cy_lvl + h_lvl / 2
             vertical_gap = btn_top - lvl_bottom
             horizontal_gap = abs(cx_btn - cx_lvl)
-            # Текст должен быть над кнопкой, но не выше её более чем на ~высоту 2 кнопок
-            # и по горизонтали совпадать с кнопкой (центр карточки)
-            if 5 < vertical_gap < h_btn * 3.5 and horizontal_gap < max(w_btn, w_lvl) * 0.25:
+            # Текст должен быть над кнопкой, но не слишком высоко
+            # и по горизонтали совпадать с кнопкой (текст может быть смещён
+            # относительно центра карточки, поэтому допуск побольше)
+            if 0 < vertical_gap < h_btn * 5 and horizontal_gap < w_btn * 0.55:
                 score = conf_lvl + conf_btn
                 if score > best_score:
                     best_score = score
                     best_pair = (cx_btn, cy_btn, conf_btn, cx_lvl, cy_lvl, conf_lvl)
 
     if best_pair is None:
-        print(f"[GOLD] Кнопка 'Перейти' под уровнем {target} не найдена (возможно, за краем экрана).")
+        print(f"[GOLD] Кнопка 'Перейти' под уровнем {target} не найдена. "
+              f"lvl_matches={len(lvl_matches)}, btn_matches={len(btn_matches)}")
         return False
 
     cx_btn, cy_btn, conf_btn, cx_lvl, cy_lvl, conf_lvl = best_pair
