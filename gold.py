@@ -415,13 +415,18 @@ def process_gold(screen_cv, region, last_gold_state, window):
     # ---- GO / WORK / GRIND ----
     if current_state == GoldState.GO_VISIBLE:
         find_and_click(GOLD_GO_IMG, screen_cv, region)
-        time.sleep(0.5)
+        time.sleep(GOLD_ACTION_DELAY)
 
         # Проверяем, что рудник действительно занят
         screen_after = take_screenshot(window, region)
         return_coords, _ = find_on_screen(get_template(GOLD_RETURN_IMG), screen_after, region)
         my_rudnik_coords, _ = find_on_screen(get_template(GOLD_MY_RUDNIK_IMG), screen_after, region)
         find_coords, _ = find_on_screen(get_template(GOLD_FIND_IMG), screen_after, region)
+        summary_coords, _ = find_on_screen(get_template(GOLD_SUMMARY_STRENGTH_TEXT_IMG), screen_after, region)
+
+        if summary_coords:
+            print("[GOLD] После 'Марш' появился попап SummaryStrenghtText. Обработаем его.")
+            return GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE
 
         if return_coords or my_rudnik_coords:
             if find_coords is None:
@@ -543,7 +548,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
             direction = 'up'
 
         scroll_in_region(region, direction, step_ratio=0.08)
-        time.sleep(0.2)
+        time.sleep(GOLD_ACTION_DELAY)
         return GoldState.LEVEL_LIST_VISIBLE
 
     # ---- FIND (поиск свободного рудника) ----
@@ -645,7 +650,7 @@ def process_gold_exit(screen_cv, region, last_exit_state, window):
 
     if current_state in (GoldState.UNKNOWN,):
         find_and_click(BACK_IMG, screen_cv, region)
-        time.sleep(0.3)
+        time.sleep(GOLD_ACTION_DELAY)
         return last_exit_state if last_exit_state is not None else GoldState.UNKNOWN
 
     return current_state
