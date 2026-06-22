@@ -459,10 +459,12 @@ def process_gold(screen_cv, region, last_gold_state, window):
 
     if current_state == GoldState.WORK_VISIBLE:
         find_and_click(GOLD_WORK_IMG, screen_cv, region)
+        time.sleep(0.2)
         return GoldState.GO_VISIBLE
 
     if current_state == GoldState.GRIND_VISIBLE:
         find_and_click(GOLD_GRIND_IMG, screen_cv, region)
+        time.sleep(0.2)
         return GoldState.WORK_VISIBLE
 
     # ---- FREE PLACE ----
