@@ -172,12 +172,17 @@ def determine_gold_state(screen_cv, region):
     if coords:
         return GoldState.RETURN_CONFIRM_VISIBLE
 
-    # 3. Кнопка "Отозвать" на экране рудника — отряд уже добывает на этом уровне
+    # 3. Кнопка "Завершить" после отзыва отряда / завершения добычи
+    coords, _ = find_on_screen(get_template(GOLD_FINISH_IMG), screen_cv, region)
+    if coords:
+        return GoldState.FINISH_VISIBLE
+
+    # 4. Кнопка "Отозвать" на экране рудника — отряд уже добывает на этом уровне
     coords, _ = find_on_screen(get_template(GOLD_RETURN_IMG), screen_cv, region)
     if coords:
         return GoldState.RETURN_BUTTON_VISIBLE
 
-    # 4. Цепочка добычи / марш
+    # 5. Цепочка добычи / марш
     coords, _ = find_on_screen(get_template(GOLD_GO_IMG), screen_cv, region)
     if coords:
         return GoldState.GO_VISIBLE
@@ -190,12 +195,12 @@ def determine_gold_state(screen_cv, region):
     if coords:
         return GoldState.GRIND_VISIBLE
 
-    # 5. Свободное место после поиска
+    # 6. Свободное место после поиска
     coords, _ = find_on_screen(get_template(GOLD_FREE_PLACE_IMG), screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
     if coords:
         return GoldState.FREE_PLACE_VISIBLE
 
-    # 6. Открыта таба рудника (виджет уровня / select_level)
+    # 7. Открыта таба рудника (виджет уровня / select_level)
     current_level = get_current_level(screen_cv, region)
     if current_level is not None:
         return GoldState.RUDNIK_TAB
@@ -204,17 +209,17 @@ def determine_gold_state(screen_cv, region):
     if coords:
         return GoldState.RUDNIK_TAB
 
-    # 7. Мой рудник (отряд уже добывает)
+    # 8. Мой рудник (отряд уже добывает)
     coords, _ = find_on_screen(get_template(GOLD_MY_RUDNIK_IMG), screen_cv, region)
     if coords:
         return GoldState.MY_RUDNIK_VISIBLE
 
-    # 8. Иконка активного уровня добычи (кликабельная)
+    # 9. Иконка активного уровня добычи (кликабельная)
     coords, _ = find_on_screen(get_template(GOLD_CURRENT_RAID_LEVEL_ICON_IMG), screen_cv, region)
     if coords:
         return GoldState.RAID_LEVEL_ICON_VISIBLE
 
-    # 9. Список уровней
+    # 10. Список уровней
     coords, _ = find_on_screen(get_template(GOLD_SELECT_LEVEL_IMG), screen_cv, region)
     if coords:
         # Если мы целенаправленно открыли список — считаем это списком уровней
@@ -222,19 +227,19 @@ def determine_gold_state(screen_cv, region):
             return GoldState.LEVEL_LIST_VISIBLE
         return GoldState.SELECT_LEVEL_VISIBLE
 
-    # 10. Меню событий — иконка рудника
+    # 11. Меню событий — иконка рудника
     coords, _ = find_on_screen(get_template(GOLD_RUDNIK_IMG), screen_cv, region)
     if coords:
         return GoldState.EVENTS_OPEN
 
-    # 11. Главный экран / меню событий без видимого рудника
+    # 12. Главный экран / меню событий без видимого рудника
     coords, _ = find_on_screen(get_template(EVENTS_IMG), screen_cv, region)
     if coords:
         if _gold_ctx.get('expected') in ('events', 'events_scroll'):
             return GoldState.EVENTS_NEED_SCROLL
         return GoldState.MAIN_SCREEN
 
-    # 12. Признаки поселения / карты
+    # 13. Признаки поселения / карты
     coords, _ = find_on_screen(get_template(VILLAGE_IMG), screen_cv, region)
     if coords:
         return GoldState.MAIN_SCREEN
@@ -281,6 +286,12 @@ def process_gold(screen_cv, region, last_gold_state, window):
         clear_gold_mission()
         _gold_ctx['expected'] = 'rudnik_tab'
         print("[GOLD] Отряд отозван.")
+        return GoldState.RUDNIK_TAB
+
+    # ---- FINISH BUTTON ----
+    if current_state == GoldState.FINISH_VISIBLE:
+        print("[GOLD] Нажимаем 'Завершить' после отзыва отряда.")
+        find_and_click(GOLD_FINISH_IMG, screen_cv, region)
         return GoldState.RUDNIK_TAB
 
     # ---- GO / WORK / GRIND ----
@@ -465,6 +476,7 @@ def process_gold_exit(screen_cv, region, last_exit_state, window):
         GoldState.RAID_LEVEL_ICON_VISIBLE,
         GoldState.RETURN_CONFIRM_VISIBLE,
         GoldState.RETURN_BUTTON_VISIBLE,
+        GoldState.FINISH_VISIBLE,
         GoldState.FREE_PLACE_VISIBLE,
     ):
         find_and_click(BACK_IMG, screen_cv, region)
