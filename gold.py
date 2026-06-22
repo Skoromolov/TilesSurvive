@@ -136,20 +136,11 @@ def click_moveon_for_target_level(screen_cv, region, target=GOLD_LEVEL, lvl_thre
     """
     Найти кнопку 'Перейти' (moveOn.png), которая расположена под текстом целевого уровня,
     и кликнуть по ней. Обрабатывает дублирующиеся кнопки на экране.
-    """
-    # 1. Находим целевой текст уровня
-    lvl_template = get_template(GOLD_LEVEL_IMAGES[target])
-    if lvl_template is None:
-        return False
-    h_lvl, w_lvl = lvl_template.shape[:2]
-    lvl_matches = find_all_on_screen(lvl_template, screen_cv, region, lvl_threshold)
-    if not lvl_matches:
-        return False
-    # Берём лучшее совпадение целевого уровня
-    cx_lvl, cy_lvl, conf_lvl = max(lvl_matches, key=lambda m: m[2])
-    lvl_bottom = cy_lvl + h_lvl / 2
 
-    # 2. Находим все кнопки 'Перейти'
+    Логика: для каждой найденной кнопки 'Перейти' ищем текст целевого уровня
+    непосредственно над ней. Так мы точно привязываем кнопку к карточке уровня.
+    """
+    # 1. Находим все кнопки 'Перейти'
     btn_template = get_template(GOLD_MOVEON_IMG)
     if btn_template is None:
         return False
@@ -158,25 +149,39 @@ def click_moveon_for_target_level(screen_cv, region, target=GOLD_LEVEL, lvl_thre
     if not btn_matches:
         return False
 
-    # 3. Выбираем кнопку, которая ближе всего расположена под текстом уровня
-    candidates = []
+    # 2. Находим все вхождения текста целевого уровня
+    lvl_template = get_template(GOLD_LEVEL_IMAGES[target])
+    if lvl_template is None:
+        return False
+    h_lvl, w_lvl = lvl_template.shape[:2]
+    lvl_matches = find_all_on_screen(lvl_template, screen_cv, region, lvl_threshold)
+    if not lvl_matches:
+        return False
+
+    # 3. Для каждой кнопки ищем текст уровня, расположенный прямо над ней
+    best_pair = None
+    best_score = -1.0
     for cx_btn, cy_btn, conf_btn in btn_matches:
         btn_top = cy_btn - h_btn / 2
-        vertical_gap = btn_top - lvl_bottom
-        horizontal_gap = abs(cx_btn - cx_lvl)
-        # Кнопка должна быть под текстом (не выше более чем на полвысины кнопки)
-        # и по горизонтали примерно совпадать с текстом уровня
-        if vertical_gap > -h_btn * 0.3 and vertical_gap < h_btn * 4 and horizontal_gap < w_btn * 0.6:
-            candidates.append((vertical_gap, cx_btn, cy_btn, conf_btn))
+        for cx_lvl, cy_lvl, conf_lvl in lvl_matches:
+            lvl_bottom = cy_lvl + h_lvl / 2
+            vertical_gap = btn_top - lvl_bottom
+            horizontal_gap = abs(cx_btn - cx_lvl)
+            # Текст должен быть над кнопкой, но не выше её более чем на ~высоту 2 кнопок
+            # и по горизонтали совпадать с кнопкой (центр карточки)
+            if 5 < vertical_gap < h_btn * 3.5 and horizontal_gap < max(w_btn, w_lvl) * 0.25:
+                score = conf_lvl + conf_btn
+                if score > best_score:
+                    best_score = score
+                    best_pair = (cx_btn, cy_btn, conf_btn, cx_lvl, cy_lvl, conf_lvl)
 
-    if not candidates:
+    if best_pair is None:
         print(f"[GOLD] Кнопка 'Перейти' под уровнем {target} не найдена (возможно, за краем экрана).")
         return False
 
-    candidates.sort(key=lambda x: x[0])
-    _, click_x, click_y, conf_btn = candidates[0]
-    pyautogui.click(click_x, click_y)
-    print(f"[GOLD] Нажата 'Перейти' под уровнем {target} ({click_x:.0f}, {click_y:.0f}), conf=({conf_lvl:.3f}/{conf_btn:.3f})")
+    cx_btn, cy_btn, conf_btn, cx_lvl, cy_lvl, conf_lvl = best_pair
+    pyautogui.click(cx_btn, cy_btn)
+    print(f"[GOLD] Нажата 'Перейти' под уровнем {target} ({cx_btn:.0f}, {cy_btn:.0f}), conf=({conf_lvl:.3f}/{conf_btn:.3f})")
     return True
 
 
