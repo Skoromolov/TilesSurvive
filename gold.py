@@ -262,12 +262,7 @@ def determine_gold_state(screen_cv, region):
     if coords:
         return GoldState.GRIND_VISIBLE
 
-    # 7. Свободное место после поиска
-    coords, _ = find_on_screen(get_template(GOLD_FREE_PLACE_IMG), screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
-    if coords:
-        return GoldState.FREE_PLACE_VISIBLE
-
-    # 8. Открыта таба рудника (виджет уровня / select_level)
+    # 7. Открыта таба рудника (виджет уровня / select_level)
     current_level = get_current_level(screen_cv, region)
     if current_level is not None:
         return GoldState.RUDNIK_TAB
@@ -404,9 +399,9 @@ def process_gold(screen_cv, region, last_gold_state, window):
 
     # ---- ПРОВЕРКА ЦЕЛЕВОГО УРОВНЯ ПЕРЕД ДОБЫЧЕЙ ----
     # После отзыва/подтверждения обязательно проверяем, что мы на нужном уровне,
-    # прежде чем нажимать find / free_place / grind / work / go.
+    # прежде чем нажимать find / grind / work / go.
     if _gold_ctx.get('need_level_check') and current_state in (
-        GoldState.FIND_VISIBLE, GoldState.FREE_PLACE_VISIBLE,
+        GoldState.FIND_VISIBLE,
         GoldState.GRIND_VISIBLE, GoldState.WORK_VISIBLE, GoldState.GO_VISIBLE
     ):
         current = get_current_level(screen_cv, region)
@@ -458,12 +453,6 @@ def process_gold(screen_cv, region, last_gold_state, window):
     if current_state == GoldState.GRIND_VISIBLE:
         find_and_click(GOLD_GRIND_IMG, screen_cv, region)
         return GoldState.WORK_VISIBLE
-
-    # ---- FREE PLACE ----
-    if current_state == GoldState.FREE_PLACE_VISIBLE:
-        find_and_click(GOLD_FREE_PLACE_IMG, screen_cv, region)
-        return GoldState.GRIND_VISIBLE
-
     # ---- MY RUDNIK / ACTIVE MINING ----
     if current_state in (GoldState.MY_RUDNIK_VISIBLE, GoldState.RAID_LEVEL_ICON_VISIBLE):
         # Если требуется отзыв — нажимаем return
@@ -562,8 +551,9 @@ def process_gold(screen_cv, region, last_gold_state, window):
 
     # ---- FIND (поиск свободного рудника) ----
     if current_state == GoldState.FIND_VISIBLE:
-        # Повторяем нажатие Find каждую секунду, пока не появится free_place
+        # Повторяем нажатие Find каждую секунду, пока не появится grind/work/go
         find_and_click(GOLD_FIND_IMG, screen_cv, region)
+        time.sleep(1.0)
         return GoldState.FIND_VISIBLE
 
     # ---- EVENTS_OPEN / EVENTS_NEED_SCROLL ----
@@ -652,7 +642,6 @@ def process_gold_exit(screen_cv, region, last_exit_state, window):
         GoldState.RETURN_BUTTON_VISIBLE,
         GoldState.FINISH_VISIBLE,
         GoldState.CONFIRM_VISIBLE,
-        GoldState.FREE_PLACE_VISIBLE,
     ):
         find_and_click(BACK_IMG, screen_cv, region)
         return current_state

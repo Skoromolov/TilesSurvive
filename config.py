@@ -104,7 +104,6 @@ GOLD_FIND_IMG = FOLDER + FOLDER_GOLD + 'find.png'
 GOLD_MY_RUDNIK_IMG = FOLDER + FOLDER_GOLD + 'my_rudnik.png'
 GOLD_RETURN_IMG = FOLDER + FOLDER_GOLD + 'return.png'
 GOLD_RETURN_BOYS_IMG = FOLDER + FOLDER_GOLD + 'return_boys.png'
-GOLD_FREE_PLACE_IMG = FOLDER + FOLDER_GOLD + 'free_place.png'
 GOLD_GRIND_IMG = FOLDER + FOLDER_GOLD + 'grind.png'
 GOLD_WORK_IMG = FOLDER + FOLDER_GOLD + 'join.png'
 GOLD_GO_IMG = FOLDER + FOLDER_GOLD + 'go.png'
@@ -207,5 +206,4 @@ class GoldState(Enum):
     SUMMARY_STRENGTH_TEXT_VISIBLE = "summary_strength_text_visible"
     RECONNECT_POPUP = "reconnect_popup"
     RECONNECT_REPEAT_POPUP = "reconnect_repeat_popup"
-    FREE_PLACE_VISIBLE = "free_place_visible"
     COMPLETED = "completed"
