@@ -204,11 +204,14 @@ def main():
                     raid_joined_at_least_once = False
                     continue
 
-            time.sleep(1)
+            if current_mode == MainMode.GOLD:
+                time.sleep(GOLD_LOOP_DELAY)
+            else:
+                time.sleep(1)
 
         except Exception as e:
             print(f"[ОШИБКА] {e}")
-            time.sleep(10)
+            time.sleep(5)
 
 
 # ==========================================

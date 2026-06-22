@@ -348,7 +348,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
             return GoldState.UNKNOWN
 
         find_and_click(GOLD_CURRENT_RAID_LEVEL_ICON_IMG, screen_cv, region)
-        time.sleep(0.5)
+        time.sleep(GOLD_ACTION_DELAY)
         return GoldState.RUDNIK_TAB
 
     # ---- RUDNIK TAB (выбор / поиск уровня) ----
@@ -443,7 +443,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
                 _gold_ctx['stuck_last_action'] = None
                 _gold_ctx['stuck_count'] = 0
             return GoldState.UNKNOWN
-        time.sleep(0.5)
+        time.sleep(GOLD_ACTION_DELAY)
         return GoldState.UNKNOWN
 
     return current_state
