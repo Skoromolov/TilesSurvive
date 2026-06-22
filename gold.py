@@ -273,7 +273,12 @@ def determine_gold_state(screen_cv, region):
     # 8. Открыта таба рудника (виджет уровня / select_level)
     current_level = get_current_level(screen_cv, region)
     if current_level is not None:
-        return GoldState.RUDNIK_TAB
+        # Если виден уровень, но нет кнопки поиска/выбора — это скорее всего попап чужого рудника
+        find_visible, _ = find_on_screen(get_template(GOLD_FIND_IMG), screen_cv, region)
+        select_visible, _ = find_on_screen(get_template(GOLD_SELECT_LEVEL_IMG), screen_cv, region)
+        if find_visible or select_visible:
+            return GoldState.RUDNIK_TAB
+        return GoldState.UNKNOWN
 
     coords, _ = find_on_screen(get_template(GOLD_RUDNIK_OPENED_IMG), screen_cv, region)
     if coords:
@@ -636,6 +641,14 @@ def process_gold(screen_cv, region, last_gold_state, window):
             find_and_click(VILLAGE_IMG, screen_cv, region)
             _gold_ctx['stuck_last_action'] = None
             _gold_ctx['stuck_count'] = 0
+
+        # Если застряли слишком долго — пробуем Escape
+        if _gold_ctx['stuck_count'] > 5:
+            print("[GOLD] Пробуем нажать Escape для закрытия попапа.")
+            pyautogui.keyDown('esc')
+            pyautogui.keyUp('esc')
+            _gold_ctx['stuck_count'] = 0
+            _gold_ctx['stuck_last_action'] = None
 
         time.sleep(0.1)
         return GoldState.UNKNOWN
