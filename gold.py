@@ -227,10 +227,13 @@ def determine_gold_state(screen_cv, region):
     # 11. Список уровней
     coords, _ = find_on_screen(get_template(GOLD_SELECT_LEVEL_IMG), screen_cv, region)
     if coords:
-        # Если мы целенаправленно открыли список — считаем это списком уровней
-        if _gold_ctx.get('expected') == 'level_list':
-            return GoldState.LEVEL_LIST_VISIBLE
         return GoldState.SELECT_LEVEL_VISIBLE
+
+    # Если мы целенаправленно открыли список — любой видимый lvl_X значит список уровней
+    if _gold_ctx.get('expected') == 'level_list':
+        found_level, _ = get_list_level(screen_cv, region)
+        if found_level is not None:
+            return GoldState.LEVEL_LIST_VISIBLE
 
     # 12. Меню событий — иконка рудника
     coords, _ = find_on_screen(get_template(GOLD_RUDNIK_IMG), screen_cv, region)
@@ -391,18 +394,32 @@ def process_gold(screen_cv, region, last_gold_state, window):
                 _gold_ctx['level_select_scroll_tries'] = 0
                 return GoldState.RUDNIK_TAB
 
-        # Прокрутка списка
+        # Прокрутка списка мелким шагом: один свайп → скриншот → поиск
         _gold_ctx['level_select_scroll_tries'] = _gold_ctx.get('level_select_scroll_tries', 0) + 1
-        if _gold_ctx['level_select_scroll_tries'] > 10:
+        if _gold_ctx['level_select_scroll_tries'] > 15:
             print("[GOLD] Не удалось найти целевой уровень. Сброс.")
             _gold_ctx['expected'] = None
             _gold_ctx['level_select_scroll_tries'] = 0
             return GoldState.UNKNOWN
 
-        direction = 'down'
-        if found_level is not None and GOLD_LEVEL < found_level:
+        if found_level is not None:
+            if GOLD_LEVEL < found_level:
+                direction = 'up'
+            elif GOLD_LEVEL > found_level:
+                direction = 'down'
+            else:
+                # Уровень виден, но кнопка 'Перейти' не нажалась — пробуем ещё раз без скролла
+                print(f"[GOLD] Уровень {GOLD_LEVEL} виден, повторяем клик 'Перейти'.")
+                if click_level_go_button(target_path, screen_cv, region):
+                    _gold_ctx['expected'] = 'rudnik_tab'
+                    _gold_ctx['level_select_scroll_tries'] = 0
+                    return GoldState.RUDNIK_TAB
+                direction = 'down'
+        else:
+            # Уровней вообще не видим — идём вверх к 1-му по умолчанию
             direction = 'up'
-        scroll_in_region(region, direction)
+
+        scroll_in_region(region, direction, step_ratio=0.15)
         return GoldState.LEVEL_LIST_VISIBLE
 
     # ---- FIND (поиск свободного рудника) ----

@@ -199,14 +199,18 @@ def swipe_horizontal(region, direction="right", duration=0.5):
     print(f"[SWIPE] {direction}: ({x1},{y}) -> ({x2},{y})")
 
 
-def scroll_in_region(region, direction="down", duration=0.5):
+def scroll_in_region(region, direction="down", duration=0.3, step_ratio=0.3):
     """
     Вертикальный скролл (drag) в центре окна.
     direction: 'down' или 'up'.
+    step_ratio: доля высоты окна, на которую выполняется один drag
+                 (по умолчанию 0.3; для списка уровней используется меньшее значение).
     """
     cx = region[0] + region[2] // 2
-    y1 = region[1] + int(region[3] * 0.65)
-    y2 = region[1] + int(region[3] * 0.35)
+    half_step = int(region[3] * step_ratio / 2)
+    y_center = region[1] + region[3] // 2
+    y1 = y_center + half_step
+    y2 = y_center - half_step
     if direction == "up":
         y1, y2 = y2, y1
     pyautogui.moveTo(cx, y1, duration=0.2)
