@@ -376,10 +376,10 @@ def process_gold(screen_cv, region, last_gold_state, window):
     # ---- SUMMARY STRENGTH TEXT POPUP ----
     if current_state == GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE:
         # Сначала ищем кнопку присоединения/атаки внутри попапа
-        join_coords, _ = find_on_screen(get_template(GOLD_JOIN_IMG), screen_cv, region)
+        join_coords, _ = find_on_screen(get_template(GOLD_WORK_IMG), screen_cv, region)
         if join_coords:
             print("[GOLD] Найдена кнопка присоединения/атаки. Нажимаем.")
-            find_and_click(GOLD_JOIN_IMG, screen_cv, region)
+            find_and_click(GOLD_WORK_IMG, screen_cv, region)
             time.sleep(0.5)
 
             screen_after = capture_window(region)
