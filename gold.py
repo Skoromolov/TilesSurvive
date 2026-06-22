@@ -12,7 +12,8 @@ from utils import *
 # ==========================================
 # ПЕРЕМЕННЫЕ СОСТОЯНИЯ ЗОЛОТА
 # ==========================================
-last_gold_time = time.time()  # инициализируем текущим временем, чтобы не стартовать с 1970 года
+last_gold_time = time.time()
+gold_first_run = True         # при первом запуске сразу идём в золото, не ждём GOLD_INTERVAL
 _gold_ctx = {
     'expected': None,          # подсказка для неоднозначных состояний
     'swipe_count': 0,
@@ -32,9 +33,13 @@ _gold_ctx = {
 # ==========================================
 def should_do_gold():
     """True если прошло GOLD_INTERVAL с последнего посещения."""
-    global last_gold_time
+    global last_gold_time, gold_first_run
     if not GOLD_ENABLED:
         return False
+    if gold_first_run:
+        gold_first_run = False
+        print("[GOLD] Первый запуск скрипта — сразу запускаем золотодобычу.")
+        return True
     elapsed = time.time() - last_gold_time
     if elapsed >= GOLD_INTERVAL:
         print(f"[GOLD] Прошло {int(elapsed)} сек с последнего рудника. Пора!")
