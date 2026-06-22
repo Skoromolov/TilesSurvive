@@ -96,7 +96,7 @@ def main():
                         current_mode = MainMode.GOLD
                         last_gold_state = None
                         reset_gold_context()
-                        time.sleep(0.5)
+                        time.sleep(0.2)
                         gold_start_time = time.time()
                         continue
                     check_and_click_help_button(screen_cv, region)
@@ -121,7 +121,7 @@ def main():
                     current_mode = MainMode.GOLD
                     last_gold_state = None
                     reset_gold_context()
-                    time.sleep(0.5)
+                    time.sleep(0.2)
                     gold_start_time = time.time()
                     continue
 

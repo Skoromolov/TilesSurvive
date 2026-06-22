@@ -418,7 +418,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
     # ---- GO / WORK / GRIND ----
     if current_state == GoldState.GO_VISIBLE:
         find_and_click(GOLD_GO_IMG, screen_cv, region)
-        time.sleep(GOLD_ACTION_DELAY)
+        time.sleep(0.2)
 
         # Проверяем, что рудник действительно занят
         screen_after = take_screenshot(window, region)
@@ -441,6 +441,13 @@ def process_gold(screen_cv, region, last_gold_state, window):
                 print("[GOLD] Кнопка поиска всё ещё видна — рудник не занят. Продолжаем поиск.")
         else:
             print("[GOLD] Рудник не занят (нет return.png / my_rudnik.png). Продолжаем поиск.")
+
+        # Если после Марш всё ещё видны join/work или go — скорее всего попап другого игрока
+        work_coords, _ = find_on_screen(get_template(GOLD_WORK_IMG), screen_after, region)
+        go_coords, _ = find_on_screen(get_template(GOLD_GO_IMG), screen_after, region)
+        if work_coords or go_coords:
+            print("[GOLD] Застряли в попапе (видны work/go). Закрываем.")
+            find_and_click(CLOSE_IMG, screen_after, region)
 
         _gold_ctx['expected'] = 'rudnik_tab'
         return GoldState.RUDNIK_TAB
@@ -499,6 +506,13 @@ def process_gold(screen_cv, region, last_gold_state, window):
         _gold_ctx['expected'] = 'rudnik_tab'
         current = get_current_level(screen_cv, region)
 
+        # Если мы не на настоящей вкладке рудника (нет кнопки поиска) — закрываем попап/окно
+        find_test, _ = find_on_screen(get_template(GOLD_FIND_IMG), screen_cv, region)
+        if find_test is None and current is not None:
+            print("[GOLD] Виден уровень, но нет кнопки поиска. Закрываем попап.")
+            find_and_click(CLOSE_IMG, screen_cv, region)
+            return GoldState.UNKNOWN
+
         if current is not None and current != GOLD_LEVEL:
             _gold_ctx['need_level_check'] = True
             print(f"[GOLD] Уровень {current}, нужен {GOLD_LEVEL}. Открываем выбор уровня.")
@@ -513,9 +527,12 @@ def process_gold(screen_cv, region, last_gold_state, window):
             _gold_ctx['need_level_check'] = False
 
         # Уровень совпадает или не удалось распознать — начинаем поиск
-        find_and_click(GOLD_FIND_IMG, screen_cv, region)
-        _gold_ctx['expected'] = 'find'
-        return GoldState.FIND_VISIBLE
+        clicked_find, _ = find_and_click(GOLD_FIND_IMG, screen_cv, region)
+        if clicked_find:
+            _gold_ctx['expected'] = 'find'
+            return GoldState.FIND_VISIBLE
+        print("[GOLD] Кнопка поиска не найдена. Пробуем закрыть/вернуться.")
+        return GoldState.UNKNOWN
 
     # ---- LEVEL LIST / SELECT LEVEL ----
     if current_state in (GoldState.SELECT_LEVEL_VISIBLE, GoldState.LEVEL_LIST_VISIBLE) \
@@ -557,9 +574,9 @@ def process_gold(screen_cv, region, last_gold_state, window):
     # ---- FIND (поиск свободного рудника) ----
     if current_state == GoldState.FIND_VISIBLE:
         # Повторяем нажатие Find каждую секунду, пока не появится free_place
+        time.sleep(0.2)
         find_and_click(GOLD_FIND_IMG, screen_cv, region)
         return GoldState.FIND_VISIBLE
-
     # ---- EVENTS_OPEN / EVENTS_NEED_SCROLL ----
     if current_state in (GoldState.EVENTS_OPEN, GoldState.EVENTS_NEED_SCROLL):
         _gold_ctx['expected'] = 'events'
@@ -585,7 +602,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
         find_and_click(EVENTS_IMG, screen_cv, region)
         _gold_ctx['swipe_count'] = 0
         _gold_ctx['events_clicked_at'] = time.time()
-        time.sleep(1.0)
+        time.sleep(0.3)
         _gold_ctx['expected'] = 'events'
         return GoldState.EVENTS_OPEN
 
@@ -604,7 +621,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
         if clicked_events_at and (time.time() - clicked_events_at) < 2.5:
             print("[GOLD] Ожидаем открытия меню событий.")
             _gold_ctx['events_clicked_at'] = None
-            time.sleep(GOLD_ACTION_DELAY)
+            time.sleep(0.1)
             return GoldState.UNKNOWN
 
         _gold_ctx['stuck_count'] = _gold_ctx.get('stuck_count', 0) + 1
@@ -620,7 +637,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
             _gold_ctx['stuck_last_action'] = None
             _gold_ctx['stuck_count'] = 0
 
-        time.sleep(GOLD_ACTION_DELAY)
+        time.sleep(0.1)
         return GoldState.UNKNOWN
 
     return current_state
