@@ -377,15 +377,17 @@ def determine_gold_state(screen_cv, region):
 
     # 16. Меню событий/календарь — calendar.png, calendar_opened.png или back.png видна.
     #     Если events.png видна — мы на главном экране (проверка выше).
-    # calendar.png — иконка календаря в меню событий (меню открыто, календарь ещё не нажат)
-    calendar_coords, calendar_conf = find_on_screen(get_template(CALENDAR_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
-    if calendar_coords:
-        return GoldState.EVENTS_MENU_OPEN
+    #     Пропускаем если expected='rudnik_tab' — мы в процессе перехода на табу рудника
+    if _gold_ctx.get('expected') not in ('rudnik_tab', 'forward_popup'):
+        # calendar.png — иконка календаря в меню событий (меню открыто, календарь ещё не нажат)
+        calendar_coords, calendar_conf = find_on_screen(get_template(CALENDAR_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        if calendar_coords:
+            return GoldState.EVENTS_MENU_OPEN
 
-    # calendar_opened.png — календарь открыт, нужно свайпать для поиска события
-    calendar_opened_coords, _ = find_on_screen(get_template(CALENDAR_OPENED_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
-    if calendar_opened_coords:
-        return GoldState.EVENTS_NEED_SCROLL
+        # calendar_opened.png — календарь открыт, нужно свайпать для поиска события
+        calendar_opened_coords, _ = find_on_screen(get_template(CALENDAR_OPENED_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        if calendar_opened_coords:
+            return GoldState.EVENTS_NEED_SCROLL
 
     back_coords, back_conf = find_on_screen(get_template(BACK_IMG), screen_cv, region)
 
@@ -582,41 +584,50 @@ def process_gold(screen_cv, region, last_gold_state, window):
         current = get_current_level(screen_cv, region)
 
         find_test, _ = find_on_screen(get_template(GOLD_FIND_IMG), screen_cv, region)
-        select_test, _ = find_on_screen(get_template(GOLD_SELECT_LEVEL_IMG), screen_cv, region)
 
-        # Если кнопка выбора уровня видна и текущий уровень не совпадает с целевым — открываем список
-        if select_test is not None:
-            if current is not None and current != GOLD_LEVEL:
-                _gold_ctx['need_level_check'] = True
-                print(f"[GOLD] Уровень {current}, нужен {GOLD_LEVEL}. Открываем выбор уровня.")
-                find_and_click(GOLD_SELECT_LEVEL_IMG, screen_cv, region)
-                _gold_ctx['expected'] = 'level_list'
-                _gold_ctx['level_select_scroll_tries'] = 0
-                time.sleep(GOLD_ACTION_DELAY)
-                return GoldState.SELECT_LEVEL_VISIBLE
-            elif current is None:
-                print(f"[GOLD] Текущий уровень не распознан, но видна кнопка выбора уровня. Открываем список.")
-                _gold_ctx['need_level_check'] = True
-                find_and_click(GOLD_SELECT_LEVEL_IMG, screen_cv, region)
-                _gold_ctx['expected'] = 'level_list'
-                _gold_ctx['level_select_scroll_tries'] = 0
-                time.sleep(GOLD_ACTION_DELAY)
-                return GoldState.SELECT_LEVEL_VISIBLE
-
-        if find_test is None:
-            print("[GOLD] На вкладке рудника нет кнопки поиска. Закрываем попап.")
-            find_and_click(GOLD_CLOSE_IMG, screen_cv, region)
-            return GoldState.UNKNOWN
-
+        # Если текущий уровень распознан и равен GOLD_LEVEL — идём искать рудник
         if current == GOLD_LEVEL:
             _gold_ctx['need_level_check'] = False
+            if find_test is not None:
+                print(f"[GOLD] Уровень {current} — целевой. Ищем свободный рудник.")
+                clicked_find, _ = find_and_click(GOLD_FIND_IMG, screen_cv, region)
+                if clicked_find:
+                    _gold_ctx['expected'] = 'find'
+                    return GoldState.FIND_VISIBLE
+            print(f"[GOLD] На уровне {current}, но кнопка поиска не найдена. Ждём.")
+            return GoldState.RUDNIK_TAB
 
-        clicked_find, _ = find_and_click(GOLD_FIND_IMG, screen_cv, region)
-        if clicked_find:
-            _gold_ctx['expected'] = 'find'
-            return GoldState.FIND_VISIBLE
-        print("[GOLD] Кнопка поиска не найдена. Пробуем закрыть/вернуться.")
-        return GoldState.UNKNOWN
+        # Если текущий уровень распознан и НЕ равен GOLD_LEVEL — открываем выбор уровня
+        if current is not None and current != GOLD_LEVEL:
+            _gold_ctx['need_level_check'] = True
+            print(f"[GOLD] Уровень {current}, нужен {GOLD_LEVEL}. Открываем выбор уровня.")
+            find_and_click(GOLD_SELECT_LEVEL_IMG, screen_cv, region)
+            _gold_ctx['expected'] = 'level_list'
+            _gold_ctx['level_select_scroll_tries'] = 0
+            time.sleep(GOLD_ACTION_DELAY)
+            return GoldState.SELECT_LEVEL_VISIBLE
+
+        # Уровень не распознан — проверяем select_level с более высоким порогом
+        select_test, _ = find_on_screen(get_template(GOLD_SELECT_LEVEL_IMG), screen_cv, region, threshold=CONFIDENCE_HIGH)
+        if select_test is not None:
+            print(f"[GOLD] Текущий уровень не распознан, но видна кнопка выбора уровня. Открываем список.")
+            _gold_ctx['need_level_check'] = True
+            find_and_click(GOLD_SELECT_LEVEL_IMG, screen_cv, region)
+            _gold_ctx['expected'] = 'level_list'
+            _gold_ctx['level_select_scroll_tries'] = 0
+            time.sleep(GOLD_ACTION_DELAY)
+            return GoldState.SELECT_LEVEL_VISIBLE
+
+        # Нет кнопки выбора уровня и уровень не распознан — если есть find, ищем
+        if find_test is not None:
+            print("[GOLD] Уровень не распознан, но кнопка поиска видна. Ищем свободный рудник.")
+            clicked_find, _ = find_and_click(GOLD_FIND_IMG, screen_cv, region)
+            if clicked_find:
+                _gold_ctx['expected'] = 'find'
+                return GoldState.FIND_VISIBLE
+
+        print("[GOLD] На вкладке рудника нет кнопки поиска. Ждём загрузки.")
+        return GoldState.RUDNIK_TAB
 
     # ---- LEVEL LIST / SELECT LEVEL ----
     if current_state in (GoldState.SELECT_LEVEL_VISIBLE, GoldState.LEVEL_LIST_VISIBLE) \
@@ -653,7 +664,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
                 _gold_ctx['level_select_scroll_tries'] = 0
                 _gold_ctx['moveon_clicked_at'] = time.time()
                 _gold_ctx['need_level_check'] = True
-                time.sleep(GOLD_ACTION_DELAY)
+                time.sleep(1.0)  # Ждём загрузки табы рудника после "Перейти"
                 return GoldState.RUDNIK_TAB
             # Кнопка "Перейти" не найдена рядом с уровнем — скроллим чтобы уровкть кнопку
             print(f"[GOLD] Уровень {GOLD_LEVEL} виден, но кнопка 'Перейти' не найдена. Скроллим.")
