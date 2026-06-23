@@ -100,6 +100,7 @@ def reset_gold_context():
     _gold_ctx['moveon_clicked_at'] = None
     _gold_ctx['recall_requested'] = False
     _gold_ctx['need_level_check'] = False
+    _gold_ctx['main_screen_tries'] = 0
 
 
 # ==========================================
@@ -716,6 +717,19 @@ def process_gold(screen_cv, region, last_gold_state, window):
             _gold_ctx['expected'] = 'events'
             _gold_ctx['swipe_count'] = 0
             return GoldState.EVENTS_RUDNIK_VISIBLE
+
+        # Счётчик попыток нажать события
+        _gold_ctx['main_screen_tries'] = _gold_ctx.get('main_screen_tries', 0) + 1
+
+        # Если застряли на main_screen > 3 попыток — клик в верхнюю часть экрана
+        if _gold_ctx['main_screen_tries'] > 3:
+            print(f"[GOLD] Застряли на main_screen ({_gold_ctx['main_screen_tries']} попыток). Клик в верхнюю часть экрана.")
+            click_x = region[0] + region[2] // 2
+            click_y = region[1] + int(region[3] * 0.15)
+            pyautogui.click(click_x, click_y)
+            time.sleep(0.5)
+            _gold_ctx['main_screen_tries'] = 0
+            return GoldState.UNKNOWN
 
         # Пытаемся нажать events.png, если не найден — пробуем book.png
         clicked, _ = find_and_click(EVENTS_IMG, screen_cv, region)
