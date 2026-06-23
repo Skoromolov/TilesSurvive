@@ -309,12 +309,15 @@ def determine_gold_state(screen_cv, region):
         return GoldState.FREE_PLACE_VISIBLE
 
     # 11. Список уровней (приоритет выше календаря, чтобы не перепутать с EVENTS_MENU_OPEN)
-    select_visible, _ = find_on_screen(get_template(GOLD_SELECT_LEVEL_IMG), screen_cv, region)
-    if select_visible:
-        return GoldState.SELECT_LEVEL_VISIBLE
-    found_level, _ = get_list_level(screen_cv, region, threshold=GOLD_LIST_LEVEL_CONFIDENCE_THRESHOLD)
-    if found_level is not None:
-        return GoldState.LEVEL_LIST_VISIBLE
+    #     НО: если мы только что нажали events.png (expected='events') — пропускаем,
+    #     т.к. select_level.png может ложно сработать на календаре событий
+    if _gold_ctx.get('expected') != 'events':
+        select_visible, _ = find_on_screen(get_template(GOLD_SELECT_LEVEL_IMG), screen_cv, region)
+        if select_visible:
+            return GoldState.SELECT_LEVEL_VISIBLE
+        found_level, _ = get_list_level(screen_cv, region, threshold=GOLD_LIST_LEVEL_CONFIDENCE_THRESHOLD)
+        if found_level is not None:
+            return GoldState.LEVEL_LIST_VISIBLE
 
     # 12. Открыта таба рудника — строго по rudnik_opened.png, current_lvl_X или find
     coords, _ = find_on_screen(get_template(GOLD_RUDNIK_OPENED_IMG), screen_cv, region)
