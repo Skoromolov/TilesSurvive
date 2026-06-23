@@ -773,7 +773,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
         clicked, _ = find_and_click(EVENTS_IMG, screen_cv, region)
         _gold_ctx['swipe_count'] = 0
         _gold_ctx['events_clicked_at'] = time.time()
-        time.sleep(0.5)
+        time.sleep(1.0)
         _gold_ctx['expected'] = 'events'
         return GoldState.EVENTS_MENU_OPEN
 
@@ -788,7 +788,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
             return GoldState.UNKNOWN
 
         clicked_events_at = _gold_ctx.get('events_clicked_at')
-        if clicked_events_at and (time.time() - clicked_events_at) < 2.5:
+        if clicked_events_at and (time.time() - clicked_events_at) < 4.0:
             print("[GOLD] Ожидаем открытия календаря событий.")
             time.sleep(0.1)
             return GoldState.UNKNOWN

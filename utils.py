@@ -156,7 +156,7 @@ def find_and_click(template_path, screen_cv, region, threshold=CONFIDENCE_THRESH
             print(f"[find_and_click] ✗ найден ниже порога: {template_path} (conf={conf:.3f}, порог={threshold})")
             return False, None
     else:
-        # print(f"[find_and_click] ✗ не найден: {template_path} (max_conf={conf:.3f}, порог={threshold})")
+        print(f"[find_and_click] ✗ не найден: {template_path} (max_conf={conf:.3f}, порог={threshold})")
         return False, None
 
 
@@ -184,12 +184,13 @@ def find_all_on_screen(template, screen_cv, region, threshold=CONFIDENCE_THRESHO
     return filtered
 
 
-def swipe_horizontal(region, direction="right", duration=0.5, y_offset=30):
+def swipe_horizontal(region, direction="right", duration=0.5, y_offset=80):
     """
     Горизонтальный свайп в верхней части окна BlueStacks.
     direction: 'right' или 'left'.
-    y_offset: фиксированный отступ от верхнего края окна (по умолчанию 30 px),
-              чтобы свайп проходил по верхнему меню/карусели событий.
+    y_offset: фиксированный отступ от верхнего края окна (по умолчанию 80 px),
+              чтобы свайп проходил по верхнему меню/карусели событий,
+              но ниже панели инструментов BlueStacks.
     """
     x1 = region[0] + int(region[2] * 0.80)
     x2 = region[0] + int(region[2] * 0.20)
