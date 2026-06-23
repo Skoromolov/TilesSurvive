@@ -712,17 +712,19 @@ def process_gold(screen_cv, region, last_gold_state, window):
     # ---- EVENTS: MENU OPEN, NEED SCROLL ----
     if current_state in (GoldState.EVENTS_MENU_OPEN, GoldState.EVENTS_NEED_SCROLL):
         _gold_ctx['expected'] = 'events_scroll'
-        # Сначала проверим, не появился ли rudnik после предыдущего скролла
+        # Сначала проверим, не появился ли rudnik после предыдущего свайпа
         rudnik_coords, _ = find_on_screen(get_template(GOLD_RUDNIK_IMG), screen_cv, region)
         if rudnik_coords:
             _gold_ctx['swipe_count'] = 0
             return GoldState.EVENTS_RUDNIK_VISIBLE
 
-        # Календарь: вертикальный скролл в центре списка
-        scroll_in_region(region, 'down', step_ratio=0.15)
+        # Верхнее меню событий: свайпаем влево чтобы добраться к началу списка,
+        # потом вправо для поиска события золотодобычи
+        direction = 'left' if _gold_ctx.get('swipe_count', 0) < 3 else 'right'
+        swipe_horizontal(region, direction)
         _gold_ctx['swipe_count'] = _gold_ctx.get('swipe_count', 0) + 1
-        if _gold_ctx['swipe_count'] > 10:
-            print("[GOLD] Не удалось найти иконку рудника в календаре. Сброс.")
+        if _gold_ctx['swipe_count'] > 15:
+            print("[GOLD] Не удалось найти иконку рудника в меню событий. Сброс.")
             _gold_ctx['swipe_count'] = 0
             _gold_ctx['expected'] = None
             return GoldState.UNKNOWN
