@@ -25,7 +25,7 @@
      с уровнями.
    - determine_gold_state() — приоритетная классификация экрана.
    - process_gold() — пошаговое флоу:
-     MAIN_SCREEN → EVENTS_OPEN → свайп вправо до rudnik.png / rudnik_opened.png
+     MAIN_SCREEN → EVENTS_MENU_OPEN → свайп вправо до EVENTS_RUDNIK_VISIBLE → клик rudnik.png → RUDNIK_TAB (rudnik_opened.png / current_lvl / find / select_level)
      → RUDNIK_TAB → проверка current_lvl_X → если не совпадает с GOLD_LEVEL,
        открываем select_level, скроллим lvl_X, нажимаем «Перейти» в карточке
        найденного уровня → снова RUDNIK_TAB → FIND → free_place → GRIND → WORK

@@ -2,61 +2,75 @@
 
 ## Резюме
 
-Скрипт `heal_and_raid.py` разделён на 5 модулей для упрощения поддержки и расширения функциональности.
+Скрипт `heal_and_raid.py` разделён на 6 модулей для упрощения поддержки и расширения функциональности: лечение, рейды, золотодобыча, быстрое лечение с карты мира.
 
 ---
 
 ## Созданные файлы
 
-| Файл | Назначение | Строк кода |
-|------|------------|------------|
-| `config.py` | Конфигурация, константы, Enum состояний | ~120 |
-| `utils.py` | Общие утилиты (окно, скриншоты, поиск, клик) | ~150 |
-| `heal.py` | Логика лечения | ~130 |
-| `raid.py` | Логика рейдов | ~250 |
-| `main.py` | Точка входа, основной цикл | ~130 |
+| Файл | Назначение | Строк кода (приблизительно) |
+|------|------------|------------------------------|
+| `config.py` | Конфигурация, константы, Enum состояний | ~220 |
+| `utils.py` | Общие утилиты (окно, скриншоты, поиск, клик) | ~180 |
+| `heal.py` | Логика лечения + быстрое лечение с карты | ~370 |
+| `raid.py` | Логика рейдов | ~330 |
+| `gold.py` | Логика золотодобычи | ~760 |
+| `main.py` | Точка входа, основной цикл | ~250 |
 
 ---
 
 ## Распределение кода
 
 ### `config.py`
-- Константы путей к изображениям (`MAIL_IMG`, `HEAL_BUTTON_IMG`, и т.д.)
-- Параметры чувствительности (`CONFIDENCE_THRESHOLD`, `NAVIGATION_THRESHOLD`)
-- Настройки режимов (`FORCE_HEAL_ONLY`, `FORCE_RAID_ONLY`)
-- Enum: `MainMode`, `HealState`, `RaidState`
+- Константы путей к изображениям (`MAIL_IMG`, `HEAL_BUTTON_IMG`, и т.д.).
+- Параметры чувствительности (`CONFIDENCE_THRESHOLD`, `NAVIGATION_THRESHOLD`, `GOLD_LEVEL_CONFIDENCE_THRESHOLD`).
+- Настройки режимов (`FORCE_HEAL_ONLY`, `FORCE_RAID_ONLY`, `FAST_HEAL_FROM_MAP_ENABLED`, `GOLD_ENABLED`).
+- Настройки золота и рейдов.
+- Enum: `MainMode`, `HealState`, `RaidState`, `GoldState`.
 
 ### `utils.py`
-- `get_window_region()` — получение области окна BlueStacks
-- `prepare_template()` — подготовка шаблона для матчинга
-- `get_template()` — кэширование шаблонов
-- `take_screenshot()` — создание скриншота через win32 API
-- `find_on_screen()` — поиск шаблона на экране
-- `find_and_click_cached()` — поиск и клик по элементу
-- `handle_reconnect()` — обработка переподключения
-- `handle_reconnect_repeat()` — обработка повторного переподключения
-- `save_debug_screenshot()` — сохранение отладочных скриншотов
+- `get_window_region()` — получение области окна BlueStacks.
+- `prepare_template()` — подготовка шаблона для матчинга.
+- `get_template()` — кэширование шаблонов.
+- `take_screenshot()` — скриншот через win32 API.
+- `find_on_screen()` / `find_all_on_screen()` — поиск шаблонов.
+- `find_and_click()` / `find_and_click_cached()` — поиск и клик.
+- `scroll_in_region()` / `swipe_horizontal()` — скролл и свайп.
+- `handle_reconnect()` / `handle_reconnect_repeat()` — обработка переподключения.
+- `save_debug_screenshot()` — отладочные скриншоты.
 
 ### `heal.py`
-- `determine_heal_state()` — определение текущего состояния лечения
-- `process_heal()` — обработка состояния лечения
-- `check_and_click_help_button()` — проверка и клик кнопки помощи союзу
+- `determine_heal_state()` — определение состояния лечения.
+- `process_heal()` — обработка состояния лечения.
+- `check_and_click_help_button()` — клик кнопки помощи союзу.
+- `determine_fast_heal_from_map_state()` / `process_fast_heal_from_map()` — быстрое лечение с карты мира.
 
 ### `raid.py`
-- `count_attack_mentions()` — подсчёт упоминаний "Атака"
-- `check_and_scroll_for_attack()` — скроллинг списка рейдов
-- `navigate_to_reid_window()` — навигация через Союз → Новости → Рейды
-- `determine_raid_state()` — определение текущего состояния рейда
-- `process_raid()` — обработка состояния рейда
-- `check_for_raid_button()` — проверка кнопок присоединения к рейду
+- `count_attack_mentions()` — подсчёт упоминаний "Атака".
+- `check_and_scroll_for_attack()` — скроллинг списка рейдов.
+- `navigate_to_reid_window()` — навигация через Союз → Новости → Рейды.
+- `determine_raid_state()` — определение состояния рейда.
+- `process_raid()` — обработка состояния рейда.
+- `check_for_raid_button()` — проверка кнопок присоединения к рейду.
+
+### `gold.py`
+- `should_do_gold()` / `update_gold_time()` — таймеры золотодобычи.
+- `gold_mission_active()` / `gold_mission_should_recall()` — таймер активной добычи.
+- `start_gold_mission()` / `clear_gold_mission()` — учёт активной добычи.
+- `reset_gold_context()` — сброс вспомогательного контекста.
+- `get_current_level()` / `get_list_level()` / `is_target_level_in_list()` — работа с уровнями.
+- `click_moveon_for_target_level()` — клик по кнопке "Перейти".
+- `determine_gold_state()` — определение состояния золотодобычи.
+- `process_gold()` — обработка одного шага.
+- `process_gold_exit()` — выход из меню рудника.
 
 ### `main.py`
-- Инициализация окна и переменных состояния
-- Основной цикл `while True`
-- Проверка режимов (`FORCE_HEAL_ONLY`, `FORCE_RAID_ONLY`)
-- Переключение между режимами HEAL и RAID
-- Обработка таймаута `RAID_JOIN_TIMEOUT`
-- Глобальная обработка reconnect
+- Инициализация окна и переменных состояния.
+- Основной цикл `while True`.
+- Проверка режимов (`FORCE_HEAL_ONLY`, `FORCE_RAID_ONLY`, `FAST_HEAL_FROM_MAP_ENABLED`).
+- Переключение между режимами HEAL, RAID, GOLD.
+- Обработка таймаутов `RAID_JOIN_TIMEOUT`, `GOLD_TIMEOUT`.
+- Глобальная обработка reconnect.
 
 ---
 
@@ -84,32 +98,43 @@ heal_and_raid.py (1250 строк)
 
 ### После рефакторинга
 ```
-main.py (130 строк)
+main.py (250 строк)
 ├── Импорт модулей
 └── Основной цикл
 
-config.py (120 строк)
+config.py (220 строк)
 ├── Константы изображений
 ├── Параметры чувствительности
+├── Настройки режимов и золота
 └── Enum состояний
 
-utils.py (150 строк)
+utils.py (180 строк)
 ├── Работа с окном
 ├── Скриншоты
 ├── Поиск и клик
+├── Скролл/свайп
 └── Обработка reconnect
 
-heal.py (130 строк)
+heal.py (370 строк)
 ├── determine_heal_state()
-└── process_heal()
+├── process_heal()
+├── check_and_click_help_button()
+└── fast_heal_from_map state machine
 
-raid.py (250 строк)
+raid.py (330 строк)
 ├── count_attack_mentions()
 ├── check_and_scroll_for_attack()
 ├── navigate_to_reid_window()
 ├── determine_raid_state()
 ├── process_raid()
 └── check_for_raid_button()
+
+gold.py (760 строк)
+├── determine_gold_state()
+├── process_gold()
+├── process_gold_exit()
+├── level helpers
+└── mission timer helpers
 ```
 
 ---
@@ -124,6 +149,7 @@ raid.py (250 строк)
 | **Быстрее отладка** | Ошибки изолированы в конкретном модуле |
 | **Удобнее читать** | Меньше кода в одном файле, понятная структура |
 | **Переиспользование** | Утилиты из `utils.py` можно использовать в других проектах |
+| **Устойчивость к лагам** | Стейт-машины переживают всплывающие окна и задержки |
 
 ---
 
@@ -131,34 +157,34 @@ raid.py (250 строк)
 
 ### Добавить новый элемент интерфейса
 
-1. Поместите изображение в соответствующую папку `pictures/`
+1. Поместите изображение в соответствующую папку `pictures/`.
 2. Добавьте константу в `config.py`:
    ```python
    NEW_BUTTON_IMG = FOLDER + FOLDER_COMMON + 'new_button.png'
    ```
-3. Используйте в нужном модуле (`heal.py`, `raid.py`, или `main.py`)
+3. Используйте в нужном модуле (`heal.py`, `raid.py`, `gold.py` или `main.py`).
 
 ### Изменить порог чувствительности
 
-Откройте `config.py` и измените нужный параметр:
+Откройте `config.py`:
 ```python
 CONFIDENCE_THRESHOLD = 0.75  # Было 0.70
 ```
 
-### Добавить новое состояние лечения
+### Добавить новое состояние
 
-1. Добавьте значение в `HealState` в `config.py`:
+1. Добавьте значение в соответствующий Enum в `config.py`:
    ```python
    class HealState(Enum):
        # ... существующие состояния ...
        NEW_STATE = "new_state"
    ```
-2. Добавьте логику определения в `determine_heal_state()` в `heal.py`
-3. Добавьте обработку в `process_heal()` в `heal.py`
+2. Добавьте логику определения в `determine_*_state()`.
+3. Добавьте обработку в `process_*()`.
 
 ### Изменить основной цикл
 
-Откройте `main.py` и измените логику в функции `main()`
+Откройте `main.py` и измените логику в функции `main()`.
 
 ---
 
@@ -175,21 +201,24 @@ CONFIDENCE_THRESHOLD = 0.75  # Было 0.70
 - [ ] Добавить логирование в файл вместо вывода в консоль
 - [ ] Добавить веб-интерфейс для мониторинга
 - [ ] Добавить поддержку конфигурационных профилей (разные настройки для разных аккаунтов)
+- [ ] Поддержка разных разрешений экрана
+- [ ] Поддержка других эмуляторов (Nox, LDPlayer)
 
 ---
 
 ## Проверка работы
 
-1. Запустите BlueStacks с игрой
-2. Выполните: `python main.py`
-3. Проверьте лог на наличие ошибок
-4. Убедитесь, что скрипт корректно переключается между режимами
+1. Запустите BlueStacks с игрой.
+2. Выполните: `python main.py`.
+3. Проверьте лог на наличие ошибок.
+4. Убедитесь, что скрипт корректно переключается между режимами.
 
 ---
 
 ## Контакты и вопросы
 
 При возникновении проблем:
-1. Проверьте логи в консоли
-2. Посмотрите скриншоты в `debug_screenshots/`
-3. Убедитесь, что все изображения в `pictures/` соответствуют названию в `config.py`
+1. Проверьте логи в консоли.
+2. Посмотрите скриншоты в `debug_screenshots/`.
+3. Убедитесь, что все изображения в `pictures/` соответствуют названию в `config.py`.
+4. Сверьтесь с `docs/logic.md` и `docs/GOLD_MODULE.md`.

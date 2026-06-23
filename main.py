@@ -8,6 +8,7 @@ Heal and Raid Bot - Основной скрипт
 
 import time
 import os
+import sys
 import win32gui
 import pyautogui
 
@@ -66,6 +67,13 @@ def main():
 
             # Сделать скриншот
             screen_cv = take_screenshot(window, region)
+
+            # Обрезаем правую панель инструментов BlueStacks (~40 px),
+            # чтобы шаблоны не матчились на toolbar иконках (like, share и т.д.)
+            TOOLBAR_WIDTH = 40
+            if screen_cv.shape[1] > TOOLBAR_WIDTH:
+                screen_cv = screen_cv[:, :-TOOLBAR_WIDTH]
+                region = (region[0], region[1], region[2] - TOOLBAR_WIDTH, region[3])
 
             # Глобальная проверка reconnect (завершает программу)
             if handle_reconnect(screen_cv, region):
