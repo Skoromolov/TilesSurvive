@@ -347,6 +347,14 @@ def determine_gold_state(screen_cv, region):
     if wild_coords:
         return GoldState.MAIN_SCREEN
 
+    # Fallback: heal_town.png и help_hands.png видны только на главном экране
+    heal_town_coords, _ = find_on_screen(get_template(HEAL_TOWN_IMG), screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
+    if heal_town_coords:
+        return GoldState.MAIN_SCREEN
+    help_hands_coords, _ = find_on_screen(get_template(HELP_HANDS_IMG), screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
+    if help_hands_coords:
+        return GoldState.MAIN_SCREEN
+
     # 16. Меню событий/календарь — back.png видна, но events.png НЕ видна.
     #     Если events.png видна — мы на главном экране (проверка выше).
     back_coords, back_conf = find_on_screen(get_template(BACK_IMG), screen_cv, region)
@@ -709,7 +717,11 @@ def process_gold(screen_cv, region, last_gold_state, window):
             _gold_ctx['swipe_count'] = 0
             return GoldState.EVENTS_RUDNIK_VISIBLE
 
-        find_and_click(EVENTS_IMG, screen_cv, region)
+        # Пытаемся нажать events.png, если не найден — пробуем book.png
+        clicked, _ = find_and_click(EVENTS_IMG, screen_cv, region)
+        if not clicked:
+            print("[GOLD] events.png не найден, пробуем book.png")
+            find_and_click(FOLDER + FOLDER_COMMON + 'book.png', screen_cv, region)
         _gold_ctx['swipe_count'] = 0
         _gold_ctx['events_clicked_at'] = time.time()
         time.sleep(0.5)
