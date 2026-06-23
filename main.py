@@ -6,9 +6,11 @@ Heal and Raid Bot - Основной скрипт
 Автоматизация лечения войск и участия в рейдах
 """
 
+import sys
+sys.dont_write_bytecode = True  # отключить кеширование .pyc (эквивалент python -B)
+
 import time
 import os
-import sys
 import win32gui
 import pyautogui
 
