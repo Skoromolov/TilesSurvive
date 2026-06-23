@@ -312,15 +312,18 @@ def determine_gold_state(screen_cv, region):
     if _gold_ctx.get('expected') != 'events':
         coords, _ = find_on_screen(get_template(GOLD_RUDNIK_OPENED_IMG), screen_cv, region)
         if coords:
-            # Проверим, нет ли сообщения об отсутствии свободных мест
-            no_free_coords, _ = find_on_screen(get_template(GOLD_NO_FREE_RUDNIK_IMG), screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
-            if no_free_coords:
-                return GoldState.NO_FREE_RUDNIK
             return GoldState.RUDNIK_TAB
 
         current_level = get_current_level(screen_cv, region)
         find_visible, _ = find_on_screen(get_template(GOLD_FIND_IMG), screen_cv, region)
-        if current_level is not None or find_visible:
+
+        # Если find.png виден — мы в режиме поиска, возвращаем FIND_VISIBLE
+        # (даже если no_free_rudnik.png виден — это временное сообщение, ищем дальше)
+        if find_visible:
+            return GoldState.FIND_VISIBLE
+
+        if current_level is not None:
+            # find не виден, но уровень распознан — проверяем no_free_rudnik
             no_free_coords, _ = find_on_screen(get_template(GOLD_NO_FREE_RUDNIK_IMG), screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
             if no_free_coords:
                 return GoldState.NO_FREE_RUDNIK
