@@ -113,10 +113,10 @@ def process_heal(screen_cv, region, last_heal_state):
             window, region_new = get_window_region()
             if region_new:
                 screen_new = take_screenshot(window, region_new)
-                # Пытаемся нажать бесплатное лечение
-                found_free, _ = find_and_click(HEAL_FREE_BUTTON_IMG, screen_new, region_new, CONFIDENCE_THRESHOLD)
+                # Пытаемся нажать бесплатное лечение (порог 0.60 — кнопка может быть частично перекрыта)
+                found_free, _ = find_and_click(HEAL_FREE_BUTTON_IMG, screen_new, region_new, 0.60)
                 if found_free:
-                    print("[HEAL] ✓ Бесплатное лечение нажato!")
+                    print("[HEAL] ✓ Бесплатное лечение нажато!")
                     return HealState.MAIN_SCREEN
                 # Пытаемся нажать обычное лечение
                 found_heal, _ = find_and_click(HEAL_BUTTON_IMG, screen_new, region_new, CONFIDENCE_THRESHOLD)

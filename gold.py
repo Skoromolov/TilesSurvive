@@ -368,7 +368,6 @@ def determine_gold_state(screen_cv, region):
     # 16. Меню событий/календарь — back.png видна, но events.png НЕ видна.
     #     Если events.png видна — мы на главном экране (проверка выше).
     back_coords, back_conf = find_on_screen(get_template(BACK_IMG), screen_cv, region)
-    book_coords, _ = find_on_screen(get_template(FOLDER + FOLDER_COMMON + 'book.png'), screen_cv, region)
 
     if back_coords:
         # back в календаре — в верхней трети; в окне рейда back обычно внизу — не путаем.
