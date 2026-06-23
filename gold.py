@@ -335,35 +335,29 @@ def determine_gold_state(screen_cv, region):
     if coords:
         return GoldState.EVENTS_RUDNIK_VISIBLE
 
-    # 14. Меню событий/календарь открыто — видна back.png, но НЕ видна кнопка События (events.png) и не виден rudник.
-    # Также проверяем альтернативную иконку событий book.png
-    back_coords, back_conf = find_on_screen(get_template(BACK_IMG), screen_cv, region)
+    # 15. Главный экран / поселение / карта — проверяем ДО back.png,
+    #     чтобы ложное срабатывание back.png не перебивало главный экран.
     events_coords, _ = find_on_screen(get_template(EVENTS_IMG), screen_cv, region)
+    if events_coords:
+        return GoldState.MAIN_SCREEN
+    village_coords, _ = find_on_screen(get_template(VILLAGE_IMG), screen_cv, region)
+    if village_coords:
+        return GoldState.MAIN_SCREEN
+    wild_coords, _ = find_on_screen(get_template(WILD_EARTH_IMG), screen_cv, region)
+    if wild_coords:
+        return GoldState.MAIN_SCREEN
+
+    # 16. Меню событий/календарь — back.png видна, но events.png НЕ видна.
+    #     Если events.png видна — мы на главном экране (проверка выше).
+    back_coords, back_conf = find_on_screen(get_template(BACK_IMG), screen_cv, region)
     book_coords, _ = find_on_screen(get_template(FOLDER + FOLDER_COMMON + 'book.png'), screen_cv, region)
-    if back_coords and events_coords is None and book_coords is None:
+
+    if back_coords:
         # back в календаре — в верхней трети; в окне рейда back обычно внизу — не путаем.
         back_rel_y = (back_coords[1] - region[1]) / region[3] if region[3] else 0
         if back_rel_y < 0.35:
             return GoldState.EVENTS_MENU_OPEN
         # Иначе это похоже на back внизу экрана (рейд, попап и т.п.) — не считаем календарём
-
-    # Если видим кнопку назад (любое меню с back), значит мы в меню и нужно искать рудник
-    # Это покрывает случаи, когда одновременно видимы back и events.png (или book.png)
-    if back_coords:
-        return GoldState.EVENTS_NEED_SCROLL
-        # Иначе это похоже на back внизу экрана (рейд, попап и т.п.) — не считаем календарём
-        # Иначе это похоже на back внизу экрана (рейд, попап и т.п.) — не считаем календарём
-
-    # 16. Главный экран / поселение / карта
-    coords, _ = find_on_screen(get_template(EVENTS_IMG), screen_cv, region)
-    if coords:
-        return GoldState.MAIN_SCREEN
-    coords, _ = find_on_screen(get_template(VILLAGE_IMG), screen_cv, region)
-    if coords:
-        return GoldState.MAIN_SCREEN
-    coords, _ = find_on_screen(get_template(WILD_EARTH_IMG), screen_cv, region)
-    if coords:
-        return GoldState.MAIN_SCREEN
 
     return GoldState.UNKNOWN
 
