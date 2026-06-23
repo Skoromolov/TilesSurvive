@@ -371,8 +371,13 @@ def determine_gold_state(screen_cv, region):
     if info_coords:
         return GoldState.MAIN_SCREEN
 
-    # 16. Меню событий/календарь — back.png видна, но events.png НЕ видна.
+    # 16. Меню событий/календарь — calendar_opened.png или back.png видна, но events.png НЕ видна.
     #     Если events.png видна — мы на главном экране (проверка выше).
+    # Сначала проверяем calendar_opened.png — точный признак открытого календаря событий
+    calendar_opened_coords, _ = find_on_screen(get_template(CALENDAR_OPENED_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+    if calendar_opened_coords:
+        return GoldState.EVENTS_MENU_OPEN
+
     back_coords, back_conf = find_on_screen(get_template(BACK_IMG), screen_cv, region)
 
     if back_coords:
@@ -779,6 +784,10 @@ def process_gold(screen_cv, region, last_gold_state, window):
             return GoldState.UNKNOWN
 
         clicked, _ = find_and_click(EVENTS_IMG, screen_cv, region)
+        if not clicked:
+            # Если events.png не найден — пробуем calendar.png (иконка календаря в меню событий)
+            print("[GOLD] events.png не найден, пробуем calendar.png")
+            find_and_click(CALENDAR_IMG, screen_cv, region)
         _gold_ctx['swipe_count'] = 0
         _gold_ctx['events_clicked_at'] = time.time()
         time.sleep(1.0)
