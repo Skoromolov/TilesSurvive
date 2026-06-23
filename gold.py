@@ -376,15 +376,15 @@ def determine_gold_state(screen_cv, region):
 
     # 16. Меню событий/календарь — calendar.png, calendar_opened.png или back.png видна.
     #     Если events.png видна — мы на главном экране (проверка выше).
-    # calendar.png — иконка календаря в меню событий (точный признак)
+    # calendar.png — иконка календаря в меню событий (меню открыто, календарь ещё не нажат)
     calendar_coords, calendar_conf = find_on_screen(get_template(CALENDAR_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if calendar_coords:
         return GoldState.EVENTS_MENU_OPEN
 
-    # calendar_opened.png — признак что календарь открыт
+    # calendar_opened.png — календарь открыт, нужно свайпать для поиска события
     calendar_opened_coords, _ = find_on_screen(get_template(CALENDAR_OPENED_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if calendar_opened_coords:
-        return GoldState.EVENTS_MENU_OPEN
+        return GoldState.EVENTS_NEED_SCROLL
 
     back_coords, back_conf = find_on_screen(get_template(BACK_IMG), screen_cv, region)
 
@@ -734,14 +734,26 @@ def process_gold(screen_cv, region, last_gold_state, window):
     # ---- EVENTS: MENU OPEN, NEED SCROLL ----
     if current_state in (GoldState.EVENTS_MENU_OPEN, GoldState.EVENTS_NEED_SCROLL):
         _gold_ctx['expected'] = 'events_scroll'
+
         # Сначала проверим, не появилась ли иконка золотодобычи после предыдущего свайпа
         gold_coords, _ = find_on_screen(get_template(EVENT_GOLD_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
         if gold_coords:
             _gold_ctx['swipe_count'] = 0
             return GoldState.EVENTS_RUDNIK_VISIBLE
 
-        # Сначала пролистываем меню событий максимально влево (к началу списка),
-        # потом свайпаем вправо для поиска события золотодобычи
+        # Если календарь ещё не открыт (calendar_opened.png не виден) — нажимаем calendar.png
+        calendar_opened_coords, _ = find_on_screen(get_template(CALENDAR_OPENED_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        if not calendar_opened_coords:
+            calendar_coords, _ = find_on_screen(get_template(CALENDAR_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+            if calendar_coords:
+                print("[GOLD] Нажимаем calendar.png чтобы открыть календарь событий.")
+                find_and_click(CALENDAR_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+                time.sleep(1.0)
+                return GoldState.EVENTS_MENU_OPEN
+            # calendar.png не найден — пробуем свайпать
+            print("[GOLD] calendar.png не найден, пробуем свайпать для поиска.")
+
+        # Календарь открыт — свайпаем для поиска события золотодобычи
         swipe_count = _gold_ctx.get('swipe_count', 0)
         if swipe_count < 5:
             # Пролистываем влево к началу списка
