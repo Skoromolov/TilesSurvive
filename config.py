@@ -120,6 +120,7 @@ GOLD_CONFIRM_IMG = FOLDER + FOLDER_GOLD + 'confirm.png'
 GOLD_SUMMARY_STRENGTH_TEXT_IMG = FOLDER + FOLDER_GOLD + 'summary_strength_text.png'
 GOLD_HAND_IMG = FOLDER + FOLDER_GOLD + 'hand.png'
 GOLD_NO_FREE_RUDNIK_IMG = FOLDER + FOLDER_GOLD + 'no_free_rudnik.png'
+GOLD_FORWARD_IMG = FOLDER + FOLDER_GOLD + 'forward.png'
 
 # ==========================================
 # ПАРАМЕТРЫ ЧУВСТВИТЕЛЬНОСТИ
