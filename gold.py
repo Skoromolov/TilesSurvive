@@ -352,12 +352,18 @@ def determine_gold_state(screen_cv, region):
     if wild_coords:
         return GoldState.MAIN_SCREEN
 
-    # Fallback: heal_town.png и help_hands.png видны только на главном экране
+    # Fallback: heal_town.png, help_hands.png, souz.png — видны на главном экране
     heal_town_coords, _ = find_on_screen(get_template(HEAL_TOWN_IMG), screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
     if heal_town_coords:
         return GoldState.MAIN_SCREEN
     help_hands_coords, _ = find_on_screen(get_template(HELP_HANDS_IMG), screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
     if help_hands_coords:
+        return GoldState.MAIN_SCREEN
+    souz_coords, _ = find_on_screen(get_template(SOUZ_IMG), screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
+    if souz_coords:
+        return GoldState.MAIN_SCREEN
+    mail_coords, _ = find_on_screen(get_template(MAIL_IMG), screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
+    if mail_coords:
         return GoldState.MAIN_SCREEN
 
     # Если видна info.png — это попап, нужно кликнуть в верхнюю часть экрана

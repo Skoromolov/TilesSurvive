@@ -125,16 +125,17 @@ def main():
                     print("[MAIN] Меню лечения открыто — продолжаем лечить.")
                     continue
 
-                # Обновляем скриншот после действий лечения
+                # Ждём закрытия меню лечения и обновляем скриншот
+                time.sleep(0.5)
                 screen_cv = take_screenshot(window, region)
 
                 # Не переключаемся в RAID/GOLD если меню лечения открыто —
                 # нужно сначала нажать кнопку лечения
                 heal_menu_open = False
-                hb_coords, _ = find_on_screen(get_template(HEAL_BUTTON_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+                hb_coords, _ = find_on_screen(get_template(HEAL_BUTTON_IMG), screen_cv, region, threshold=0.60)
                 if hb_coords:
                     heal_menu_open = True
-                hfb_coords, _ = find_on_screen(get_template(HEAL_FREE_BUTTON_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+                hfb_coords, _ = find_on_screen(get_template(HEAL_FREE_BUTTON_IMG), screen_cv, region, threshold=0.60)
                 if hfb_coords:
                     heal_menu_open = True
 
