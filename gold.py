@@ -727,12 +727,17 @@ def process_gold(screen_cv, region, last_gold_state, window):
             _gold_ctx['swipe_count'] = 0
             return GoldState.EVENTS_RUDNIK_VISIBLE
 
-        # Верхнее меню событий: свайпаем влево чтобы добраться к началу списка,
-        # потом вправо для поиска события золотодобычи
-        direction = 'left' if _gold_ctx.get('swipe_count', 0) < 3 else 'right'
-        swipe_horizontal(region, direction)
-        _gold_ctx['swipe_count'] = _gold_ctx.get('swipe_count', 0) + 1
-        if _gold_ctx['swipe_count'] > 15:
+        # Сначала пролистываем меню событий максимально влево (к началу списка),
+        # потом свайпаем вправо для поиска события золотодобычи
+        swipe_count = _gold_ctx.get('swipe_count', 0)
+        if swipe_count < 5:
+            # Пролистываем влево к началу списка
+            swipe_horizontal(region, 'left')
+        else:
+            # Ищем золотодобычу, свайпая вправо
+            swipe_horizontal(region, 'right')
+        _gold_ctx['swipe_count'] = swipe_count + 1
+        if _gold_ctx['swipe_count'] > 20:
             print("[GOLD] Не удалось найти иконку рудника в меню событий. Сброс.")
             _gold_ctx['swipe_count'] = 0
             _gold_ctx['expected'] = None
