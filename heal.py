@@ -132,21 +132,19 @@ def process_heal(screen_cv, region, last_heal_state):
 
     if current_state == HealState.HEAL_MENU_OPEN:
         # Попытка найти и нажать кнопку бесплатного лечения, если доступна
-        #     try:
         found, _ = find_and_click(HEAL_FREE_BUTTON_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)
-        # except Exception as e:
-        #     print(f"[HEAL] Error in HEAL_MENU_OPEN (free button): {e}")
-        #     found = False
         if found:
+            print("[HEAL] ✓ Бесплатное лечение нажато!")
             return HealState.MAIN_SCREEN
         # Если бесплатное лечение недоступно, используем обычное лечение
-        #     try:
         found, _ = find_and_click(HEAL_BUTTON_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)
-            # except Exception as e:
-            #     print(f"[HEAL] Error in HEAL_MENU_OPEN (heal button): {e}")
-            #     found = False
         if found:
+            print("[HEAL] ✓ Обычное лечение нажато!")
             return HealState.MAIN_SCREEN
+        # Если ни одна кнопка не найдена — закрываем меню
+        print("[HEAL] Меню лечения открыто, но кнопки не найдены. Закрываем.")
+        find_and_click(BACK_IMG, screen_cv, region)
+        return HealState.UNKNOWN
     if current_state == HealState.FAST_USE_POPUP:
         try:
             found, _ = find_and_click(CLOSE_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)

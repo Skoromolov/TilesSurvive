@@ -121,6 +121,21 @@ def navigate_to_reid_window():
 
     screen_cv = take_screenshot(window, region)
 
+    # Если находимся в попапе лечения — сначала закрываем его через back/close
+    heal_btn_coords, _ = find_on_screen(get_template(HEAL_BUTTON_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+    if heal_btn_coords:
+        print("[RAID] Обнаружен попап лечения — закрываем перед навигацией.")
+        find_and_click(BACK_IMG, screen_cv, region)
+        time.sleep(0.3)
+        screen_cv = take_screenshot(window, region)
+
+    # Проверим, не находимся ли мы уже в окне рейдов
+    reid_active, _ = find_on_screen(get_template(RAID_ACTIVE_IMG), screen_cv, region, threshold=NAVIGATION_THRESHOLD)
+    reid_not_active, _ = find_on_screen(get_template(RAID_NOT_ACTIVE_IMG), screen_cv, region, threshold=NAVIGATION_THRESHOLD)
+    if reid_active or reid_not_active:
+        print("[RAID] Уже в окне рейдов.")
+        return True
+
     if find_and_click(SOUZ_IMG, screen_cv, region, threshold=NAVIGATION_THRESHOLD):
         time.sleep(0.3)
     else:
@@ -316,6 +331,18 @@ def check_for_raid_button(screen_cv, region):
     Проверить наличие кнопок присоединения к рейду.
     Возвращает: True если найдена и нажата
     """
+    # Не ищем рейды если открыт попап лечения — heal_button или heal_free_button
+    heal_button = get_template(HEAL_BUTTON_IMG)
+    heal_free_button = get_template(HEAL_FREE_BUTTON_IMG)
+    if heal_button is not None:
+        coords, _ = find_on_screen(heal_button, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        if coords:
+            return False
+    if heal_free_button is not None:
+        coords, _ = find_on_screen(heal_free_button, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        if coords:
+            return False
+
     # Проверка первой кнопки
     found, conf = find_on_screen(get_template(RAID_HAVE_TO_CONNECT_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if found:

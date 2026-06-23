@@ -119,6 +119,9 @@ def main():
                 check_and_click_help_button(screen_cv, region)
                 last_heal_state = process_heal(screen_cv, region, last_heal_state)
 
+                # Обновляем скриншот после действий лечения
+                screen_cv = take_screenshot(window, region)
+
                 # Потом проверяем рейды
                 if check_for_raid_button(screen_cv, region):
                     print("[MAIN] Переключение в режим RAID")

@@ -337,18 +337,15 @@ def determine_gold_state(screen_cv, region):
 
     # 15. Главный экран / поселение / карта — проверяем ДО back.png,
     #     чтобы ложное срабатывание back.png не перебивало главный экран.
-    events_coords, events_conf = find_on_screen(get_template(EVENTS_IMG), screen_cv, region)
+    events_coords, _ = find_on_screen(get_template(EVENTS_IMG), screen_cv, region)
     if events_coords:
         return GoldState.MAIN_SCREEN
-    village_coords, village_conf = find_on_screen(get_template(VILLAGE_IMG), screen_cv, region)
+    village_coords, _ = find_on_screen(get_template(VILLAGE_IMG), screen_cv, region)
     if village_coords:
         return GoldState.MAIN_SCREEN
-    wild_coords, wild_conf = find_on_screen(get_template(WILD_EARTH_IMG), screen_cv, region)
+    wild_coords, _ = find_on_screen(get_template(WILD_EARTH_IMG), screen_cv, region)
     if wild_coords:
         return GoldState.MAIN_SCREEN
-
-    # Отладка: ни один главный шаблон не найден — выводим confidence
-    print(f"[GOLD DEBUG] events conf={events_conf:.3f}, village conf={village_conf:.3f}, wild conf={wild_conf:.3f}", flush=True)
 
     # 16. Меню событий/календарь — back.png видна, но events.png НЕ видна.
     #     Если events.png видна — мы на главном экране (проверка выше).
