@@ -122,6 +122,23 @@ def main():
                 # Обновляем скриншот после действий лечения
                 screen_cv = take_screenshot(window, region)
 
+                # Не переключаемся в RAID/GOLD если меню лечения открыто —
+                # нужно сначала нажать кнопку лечения
+                heal_menu_open = False
+                hb_coords, _ = find_on_screen(get_template(HEAL_BUTTON_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+                if hb_coords:
+                    heal_menu_open = True
+                hfb_coords, _ = find_on_screen(get_template(HEAL_FREE_BUTTON_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+                if hfb_coords:
+                    heal_menu_open = True
+
+                if heal_menu_open:
+                    # Нажимаем кнопку лечения прямо сейчас
+                    print("[MAIN] Меню лечения открыто — лечим перед переключением режима.")
+                    last_heal_state = process_heal(screen_cv, region, last_heal_state)
+                    time.sleep(0.3)
+                    continue
+
                 # Потом проверяем рейды
                 if check_for_raid_button(screen_cv, region):
                     print("[MAIN] Переключение в режим RAID")
