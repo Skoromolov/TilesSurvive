@@ -119,14 +119,10 @@ def main():
                 check_and_click_help_button(screen_cv, region)
                 last_heal_state = process_heal(screen_cv, region, last_heal_state)
 
-                # Если process_heal только что открыл меню лечения —
-                # даём время открыться и продолжаем лечить, не переключаясь в RAID/GOLD
+                # Если process_heal открыл меню лечения, но не нажал кнопку —
+                # продолжаем лечить, не переключаясь в RAID/GOLD
                 if last_heal_state == HealState.HEAL_MENU_OPEN:
-                    time.sleep(0.5)
-                    screen_cv = take_screenshot(window, region)
-                    print("[MAIN] Меню лечения открыто — лечим перед переключением режима.")
-                    last_heal_state = process_heal(screen_cv, region, last_heal_state)
-                    time.sleep(0.3)
+                    print("[MAIN] Меню лечения открыто — продолжаем лечить.")
                     continue
 
                 # Обновляем скриншот после действий лечения

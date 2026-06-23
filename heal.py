@@ -108,6 +108,22 @@ def process_heal(screen_cv, region, last_heal_state):
             print(f"[HEAL] Error in HEAL_ICON: {e}")
             found = False
         if found:
+            # Ждём открытия меню лечения и сразу ищем кнопки лечения
+            time.sleep(1.0)
+            window, region_new = get_window_region()
+            if region_new:
+                screen_new = take_screenshot(window, region_new)
+                # Пытаемся нажать бесплатное лечение
+                found_free, _ = find_and_click(HEAL_FREE_BUTTON_IMG, screen_new, region_new, CONFIDENCE_THRESHOLD)
+                if found_free:
+                    print("[HEAL] ✓ Бесплатное лечение нажato!")
+                    return HealState.MAIN_SCREEN
+                # Пытаемся нажать обычное лечение
+                found_heal, _ = find_and_click(HEAL_BUTTON_IMG, screen_new, region_new, CONFIDENCE_THRESHOLD)
+                if found_heal:
+                    print("[HEAL] ✓ Обычное лечение нажато!")
+                    return HealState.MAIN_SCREEN
+                print("[HEAL] Меню лечения открыто, но кнопки не найдены.")
             return HealState.HEAL_MENU_OPEN
         return None
 
