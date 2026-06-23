@@ -338,8 +338,8 @@ def determine_gold_state(screen_cv, region):
     if coords:
         return GoldState.FORWARD_POPUP_VISIBLE
 
-    # 14. Меню событий: видна иконка рудника → можно кликать
-    coords, _ = find_on_screen(get_template(GOLD_RUDNIK_IMG), screen_cv, region)
+    # 14. Меню событий: видна иконка золотодобычи → можно кликать
+    coords, _ = find_on_screen(get_template(EVENT_GOLD_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if coords:
         return GoldState.EVENTS_RUDNIK_VISIBLE
 
@@ -712,10 +712,10 @@ def process_gold(screen_cv, region, last_gold_state, window):
     if current_state == GoldState.EVENTS_RUDNIK_VISIBLE:
         _gold_ctx['expected'] = 'forward_popup'
         _gold_ctx['swipe_count'] = 0
-        clicked, _ = find_and_click(GOLD_RUDNIK_IMG, screen_cv, region)
+        clicked, _ = find_and_click(EVENT_GOLD_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
         if clicked:
-            print("[GOLD] Нажали на иконку рудника в календаре. Ждём попап 'Вперёд'.")
-            time.sleep(0.5)
+            print("[GOLD] Нажали на иконку золотодобычи в календаре. Ждём попап 'Вперёд'.")
+            time.sleep(1.0)
             return GoldState.FORWARD_POPUP_VISIBLE
         return GoldState.EVENTS_MENU_OPEN
 
@@ -734,9 +734,9 @@ def process_gold(screen_cv, region, last_gold_state, window):
     # ---- EVENTS: MENU OPEN, NEED SCROLL ----
     if current_state in (GoldState.EVENTS_MENU_OPEN, GoldState.EVENTS_NEED_SCROLL):
         _gold_ctx['expected'] = 'events_scroll'
-        # Сначала проверим, не появился ли rudnik после предыдущего свайпа
-        rudnik_coords, _ = find_on_screen(get_template(GOLD_RUDNIK_IMG), screen_cv, region)
-        if rudnik_coords:
+        # Сначала проверим, не появилась ли иконка золотодобычи после предыдущего свайпа
+        gold_coords, _ = find_on_screen(get_template(EVENT_GOLD_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        if gold_coords:
             _gold_ctx['swipe_count'] = 0
             return GoldState.EVENTS_RUDNIK_VISIBLE
 
@@ -751,7 +751,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
             swipe_horizontal(region, 'right')
         _gold_ctx['swipe_count'] = swipe_count + 1
         if _gold_ctx['swipe_count'] > 20:
-            print("[GOLD] Не удалось найти иконку рудника в меню событий. Сброс.")
+            print("[GOLD] Не удалось найти иконку золотодобычи в меню событий. Сброс.")
             _gold_ctx['swipe_count'] = 0
             _gold_ctx['expected'] = None
             return GoldState.UNKNOWN
@@ -759,10 +759,10 @@ def process_gold(screen_cv, region, last_gold_state, window):
 
     # ---- MAIN SCREEN ----
     if current_state == GoldState.MAIN_SCREEN:
-        # Проверим, не открыт ли уже календарь (rudnik виден)
-        rudnik_coords, _ = find_on_screen(get_template(GOLD_RUDNIK_IMG), screen_cv, region)
-        if rudnik_coords:
-            print("[GOLD] Календарь уже открыт, rudnik виден.")
+        # Проверим, не открыт ли уже календарь (event_gold виден)
+        gold_coords, _ = find_on_screen(get_template(EVENT_GOLD_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        if gold_coords:
+            print("[GOLD] Календарь уже открыт, иконка золотодобычи видна.")
             _gold_ctx['expected'] = 'events'
             _gold_ctx['swipe_count'] = 0
             return GoldState.EVENTS_RUDNIK_VISIBLE
