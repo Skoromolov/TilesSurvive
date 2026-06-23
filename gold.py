@@ -371,9 +371,14 @@ def determine_gold_state(screen_cv, region):
     if info_coords:
         return GoldState.MAIN_SCREEN
 
-    # 16. Меню событий/календарь — calendar_opened.png или back.png видна, но events.png НЕ видна.
+    # 16. Меню событий/календарь — calendar.png, calendar_opened.png или back.png видна.
     #     Если events.png видна — мы на главном экране (проверка выше).
-    # Сначала проверяем calendar_opened.png — точный признак открытого календаря событий
+    # calendar.png — иконка календаря в меню событий (точный признак)
+    calendar_coords, calendar_conf = find_on_screen(get_template(CALENDAR_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+    if calendar_coords:
+        return GoldState.EVENTS_MENU_OPEN
+
+    # calendar_opened.png — признак что календарь открыт
     calendar_opened_coords, _ = find_on_screen(get_template(CALENDAR_OPENED_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if calendar_opened_coords:
         return GoldState.EVENTS_MENU_OPEN
