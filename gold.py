@@ -209,21 +209,18 @@ def click_moveon_for_target_level(screen_cv, region, target=GOLD_LEVEL, lvl_thre
             for cx_lvl_i, cy_lvl_i, conf_lvl_i in lvl_matches:
                 vertical_gap = abs(cy_btn - cy_lvl_i)
                 horizontal_gap = abs(cx_btn - cx_lvl_i)
-                # Кнопка должна быть в той же карточке по вертикали и не слишком далеко по горизонтали.
-                # Обычно она либо под текстом уровня, либо справа/слева от него.
-                if vertical_gap < h_btn * 3 and horizontal_gap < max(w_btn, w_lvl) * 2.5:
+                # Кнопка "Перейти" — большая (254x50), карточка уровня ~270px высотой.
+                # Увеличили допустимый vertical_gap до h_btn * 6 (было 3).
+                if vertical_gap < h_btn * 6 and horizontal_gap < max(w_btn, w_lvl) * 3:
                     score = conf_lvl_i + conf_btn - vertical_gap / 100.0
                     if score > best_score:
                         best_score = score
                         best_pair = (cx_btn, cy_btn, conf_btn, cx_lvl_i, cy_lvl_i, conf_lvl_i)
 
     if best_pair is None:
-        if fallback_click:
-            pyautogui.click(*fallback_click)
-            print(f"[GOLD] Кнопка 'Перейти' не найдена рядом с уровнем {target}, клик под карточку ({fallback_x:.0f}, {fallback_y:.0f}), conf={conf_lvl:.3f}")
-            return True
-        print(f"[GOLD] Кнопка 'Перейти' у уровня {target} не найдена. "
-              f"lvl_matches={len(lvl_matches)}, btn_matches={len(btn_matches) if btn_matches else 0}")
+        print(f"[GOLD] Кнопка 'Перейти' не найдена рядом с уровнем {target}. "
+              f"lvl_matches={len(lvl_matches)}, btn_matches={len(btn_matches) if btn_matches else 0}. "
+              f"Возможно уровень {target} за пределами экрана — нужен скролл.")
         return False
 
     cx_btn, cy_btn, conf_btn, cx_lvl, cy_lvl, conf_lvl = best_pair
@@ -658,6 +655,19 @@ def process_gold(screen_cv, region, last_gold_state, window):
                 _gold_ctx['need_level_check'] = True
                 time.sleep(GOLD_ACTION_DELAY)
                 return GoldState.RUDNIK_TAB
+            # Кнопка "Перейти" не найдена рядом с уровнем — скроллим чтобы уровкть кнопку
+            print(f"[GOLD] Уровень {GOLD_LEVEL} виден, но кнопка 'Перейти' не найдена. Скроллим.")
+            found_level, _ = get_list_level(screen_cv, region)
+            if found_level is not None:
+                if GOLD_LEVEL < found_level:
+                    direction = 'up'
+                else:
+                    direction = 'down'
+            else:
+                direction = 'down'
+            scroll_in_region(region, direction, step_ratio=0.15)
+            time.sleep(GOLD_ACTION_DELAY)
+            return GoldState.LEVEL_LIST_VISIBLE
 
         found_level, _ = get_list_level(screen_cv, region)
 
