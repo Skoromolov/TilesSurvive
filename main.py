@@ -102,7 +102,9 @@ def main():
             # Режим HEAL
             if (current_mode == MainMode.HEAL) or FORCE_HEAL_ONLY:
                 if FORCE_HEAL_ONLY:
-                    # Золото: только если включено и пора
+                    check_and_click_help_button(screen_cv, region)
+                    last_heal_state = process_heal(screen_cv, region, last_heal_state)
+                    # Золото: только если включено и пора — после лечения
                     if GOLD_ENABLED and (should_do_gold() or gold_mission_should_recall()):
                         print("[MAIN] Переключение в режим GOLD (FORCE_HEAL_ONLY)")
                         current_mode = MainMode.GOLD
@@ -111,21 +113,13 @@ def main():
                         time.sleep(0.2)
                         gold_start_time = time.time()
                         continue
-                    check_and_click_help_button(screen_cv, region)
-                    last_heal_state = process_heal(screen_cv, region, last_heal_state)
                     continue
 
-                # Золото
-                if GOLD_ENABLED and (should_do_gold() or gold_mission_should_recall()):
-                    print("[MAIN] Переключение в режим GOLD")
-                    current_mode = MainMode.GOLD
-                    last_gold_state = None
-                    reset_gold_context()
-                    time.sleep(0.2)
-                    gold_start_time = time.time()
-                    continue
+                # Сначала лечим
+                check_and_click_help_button(screen_cv, region)
+                last_heal_state = process_heal(screen_cv, region, last_heal_state)
 
-                # Автопереключение — проверить кнопки рейда
+                # Потом проверяем рейды
                 if check_for_raid_button(screen_cv, region):
                     print("[MAIN] Переключение в режим RAID")
                     current_mode = MainMode.RAID
@@ -137,8 +131,17 @@ def main():
                     last_raid_state = None
                     continue
 
-                check_and_click_help_button(screen_cv, region)
-                last_heal_state = process_heal(screen_cv, region, last_heal_state)
+                # Потом золото — если включено и пора
+                if GOLD_ENABLED and (should_do_gold() or gold_mission_should_recall()):
+                    print("[MAIN] Переключение в режим GOLD")
+                    current_mode = MainMode.GOLD
+                    last_gold_state = None
+                    reset_gold_context()
+                    time.sleep(0.2)
+                    gold_start_time = time.time()
+                    continue
+
+                continue
 
             # Режим GOLD
             elif current_mode == MainMode.GOLD:

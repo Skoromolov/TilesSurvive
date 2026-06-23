@@ -13,7 +13,7 @@ from utils import *
 # ПЕРЕМЕННЫЕ СОСТОЯНИЯ ЗОЛОТА
 # ==========================================
 last_gold_time = time.time()
-gold_first_run = True         # при первом запуске сразу идём в золото, не ждём GOLD_INTERVAL
+gold_first_run = False        # не прыгаем в золото при старте; сначала heal/raid, потом золото по таймеру
 _gold_ctx = {
     'expected': None,          # подсказка для неоднозначных состояний
     'swipe_count': 0,

@@ -125,7 +125,7 @@ GOLD_FORWARD_IMG = FOLDER + FOLDER_GOLD + 'forward.png'
 # ==========================================
 # ПАРАМЕТРЫ ЧУВСТВИТЕЛЬНОСТИ
 # ==========================================
-CONFIDENCE_THRESHOLD = 0.55
+CONFIDENCE_THRESHOLD = 0.70
 CONFIDENCE_HIGH = 0.95
 MARCH_THRESHOLD = 0.90
 NAVIGATION_THRESHOLD = 0.90
