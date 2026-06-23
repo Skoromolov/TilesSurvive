@@ -356,6 +356,11 @@ def determine_gold_state(screen_cv, region):
     if help_hands_coords:
         return GoldState.MAIN_SCREEN
 
+    # Если видна info.png — это попап, нужно кликнуть в верхнюю часть экрана
+    info_coords, _ = find_on_screen(get_template(INFO_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+    if info_coords:
+        return GoldState.MAIN_SCREEN
+
     # 16. Меню событий/календарь — back.png видна, но events.png НЕ видна.
     #     Если events.png видна — мы на главном экране (проверка выше).
     back_coords, back_conf = find_on_screen(get_template(BACK_IMG), screen_cv, region)
@@ -720,6 +725,17 @@ def process_gold(screen_cv, region, last_gold_state, window):
 
         # Счётчик попыток нажать события
         _gold_ctx['main_screen_tries'] = _gold_ctx.get('main_screen_tries', 0) + 1
+
+        # Если видна info.png — это попап, кликаем в верхнюю часть экрана для закрытия
+        info_coords, _ = find_on_screen(get_template(INFO_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        if info_coords:
+            print("[GOLD] Видна info.png — попап открыт. Клик в верхнюю часть экрана для закрытия.")
+            click_x = region[0] + region[2] // 2
+            click_y = region[1] + int(region[3] * 0.15)
+            pyautogui.click(click_x, click_y)
+            time.sleep(0.5)
+            _gold_ctx['main_screen_tries'] = 0
+            return GoldState.UNKNOWN
 
         # Если застряли на main_screen > 3 попыток — клик в верхнюю часть экрана
         if _gold_ctx['main_screen_tries'] > 3:

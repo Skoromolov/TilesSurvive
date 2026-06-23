@@ -60,6 +60,7 @@ CLOSE_IMG = FOLDER + FOLDER_COMMON + 'close.png'
 BACK_IMG = FOLDER + FOLDER_COMMON + 'back.png'
 HELP_HANDS_IMG = FOLDER + FOLDER_COMMON + 'help_hands.png'
 EVENTS_IMG = FOLDER + FOLDER_COMMON + 'events.png'
+INFO_IMG = FOLDER + FOLDER_COMMON + 'info.png'
 GOLD_CLOSE_IMG = FOLDER + FOLDER_GOLD + 'close.png'  # кнопка закрытия попапов внутри золотодобычи
 
 # Gold
