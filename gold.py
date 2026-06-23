@@ -25,6 +25,11 @@ _gold_ctx = {
     'recall_requested': False,
     'started_at': None,
     'current_mining_level': None,
+    'need_level_check': False,
+    'main_screen_tries': 0,
+    'raid_icon_clicks': 0,
+    'find_started_at': None,
+    'exit_attempts': 0,
 }
 
 
@@ -101,6 +106,9 @@ def reset_gold_context():
     _gold_ctx['recall_requested'] = False
     _gold_ctx['need_level_check'] = False
     _gold_ctx['main_screen_tries'] = 0
+    _gold_ctx['raid_icon_clicks'] = 0
+    _gold_ctx['find_started_at'] = None
+    _gold_ctx['exit_attempts'] = 0
 
 
 # ==========================================
@@ -268,12 +276,23 @@ def determine_gold_state(screen_cv, region):
     if coords:
         return GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE
 
-    # 6. Кнопка "Отозвать" на экране рудника
+    # 6. Мой рудник / активная добыча — проверяем ДО return.png,
+    #    т.к. return.png видна на экране добычи всегда (как кнопка отзыва)
+    coords, _ = find_on_screen(get_template(GOLD_MY_RUDNIK_IMG), screen_cv, region)
+    if coords:
+        return GoldState.MY_RUDNIK_VISIBLE
+
+    # 7. Иконка активного уровня добычи
+    coords, _ = find_on_screen(get_template(GOLD_CURRENT_RAID_LEVEL_ICON_IMG), screen_cv, region)
+    if coords:
+        return GoldState.RAID_LEVEL_ICON_VISIBLE
+
+    # 8. Кнопка "Отозвать" на экране рудника
     coords, _ = find_on_screen(get_template(GOLD_RETURN_IMG), screen_cv, region)
     if coords:
         return GoldState.RETURN_BUTTON_VISIBLE
 
-    # 7. Цепочка добычи / марш
+    # 9. Цепочка добычи / марш
     coords, _ = find_on_screen(get_template(GOLD_GO_IMG), screen_cv, region)
     if coords:
         return GoldState.GO_VISIBLE
@@ -284,20 +303,10 @@ def determine_gold_state(screen_cv, region):
     if coords:
         return GoldState.GRIND_VISIBLE
 
-    # 8. Свободное место после поиска
+    # 10. Свободное место после поиска
     coords, _ = find_on_screen(get_template(GOLD_FREE_PLACE_IMG), screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
     if coords:
         return GoldState.FREE_PLACE_VISIBLE
-
-    # 9. Мой рудник / активная добыча
-    coords, _ = find_on_screen(get_template(GOLD_MY_RUDNIK_IMG), screen_cv, region)
-    if coords:
-        return GoldState.MY_RUDNIK_VISIBLE
-
-    # 10. Иконка активного уровня добычи
-    coords, _ = find_on_screen(get_template(GOLD_CURRENT_RAID_LEVEL_ICON_IMG), screen_cv, region)
-    if coords:
-        return GoldState.RAID_LEVEL_ICON_VISIBLE
 
     # 11. Список уровней (приоритет выше календаря, чтобы не перепутать с EVENTS_MENU_OPEN)
     select_visible, _ = find_on_screen(get_template(GOLD_SELECT_LEVEL_IMG), screen_cv, region)
@@ -321,12 +330,7 @@ def determine_gold_state(screen_cv, region):
             return GoldState.NO_FREE_RUDNIK
         return GoldState.RUDNIK_TAB
 
-    # 13. На уровне нет свободных рудников (на экране выбора уровня)
-    no_free_coords, _ = find_on_screen(get_template(GOLD_NO_FREE_RUDNIK_IMG), screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
-    if no_free_coords:
-        return GoldState.NO_FREE_RUDNIK
-
-    # 14. Попап события с кнопкой "Вперёд"
+    # 13. Попап события с кнопкой "Вперёд"
     coords, _ = find_on_screen(get_template(GOLD_FORWARD_IMG), screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
     if coords:
         return GoldState.FORWARD_POPUP_VISIBLE
@@ -552,6 +556,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
     if current_state == GoldState.RUDNIK_TAB:
         _gold_ctx['expected'] = 'rudnik_tab'
         _gold_ctx['raid_icon_clicks'] = 0
+        _gold_ctx['find_started_at'] = None  # сброс таймаута поиска
         current = get_current_level(screen_cv, region)
 
         find_test, _ = find_on_screen(get_template(GOLD_FIND_IMG), screen_cv, region)
@@ -667,6 +672,17 @@ def process_gold(screen_cv, region, last_gold_state, window):
 
     # ---- FIND (поиск свободного рудника) ----
     if current_state == GoldState.FIND_VISIBLE:
+        # Таймаут поиска: если ищем дольше GOLD_SEARCH_TIMEOUT — выходим
+        find_started = _gold_ctx.get('find_started_at')
+        if find_started is None:
+            _gold_ctx['find_started_at'] = time.time()
+            find_started = _gold_ctx['find_started_at']
+        elapsed_find = time.time() - find_started
+        if elapsed_find > GOLD_SEARCH_TIMEOUT:
+            print(f"[GOLD] Поиск длится {int(elapsed_find)} сек — таймаут {GOLD_SEARCH_TIMEOUT} сек. Сброс.")
+            _gold_ctx['find_started_at'] = None
+            find_and_click(GOLD_CLOSE_IMG, screen_cv, region)
+            return GoldState.UNKNOWN
         time.sleep(0.2)
         find_and_click(GOLD_FIND_IMG, screen_cv, region)
         return GoldState.FIND_VISIBLE
@@ -747,11 +763,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
             _gold_ctx['main_screen_tries'] = 0
             return GoldState.UNKNOWN
 
-        # Пытаемся нажать events.png, если не найден — пробуем book.png
         clicked, _ = find_and_click(EVENTS_IMG, screen_cv, region)
-        if not clicked:
-            print("[GOLD] events.png не найден, пробуем book.png")
-            find_and_click(FOLDER + FOLDER_COMMON + 'book.png', screen_cv, region)
         _gold_ctx['swipe_count'] = 0
         _gold_ctx['events_clicked_at'] = time.time()
         time.sleep(0.5)
