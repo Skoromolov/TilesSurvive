@@ -517,9 +517,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
     # ---- GO / WORK / GRIND ----
     if current_state == GoldState.GO_VISIBLE:
         find_and_click(GOLD_GO_IMG, screen_cv, region)
-        # После "Марш" игра может долго обновлять экран. Ждём, чтобы
-        # корректно определить, успешно ли запустилась добыча.
-        time.sleep(1.0)
+        time.sleep(0.2)
         screen_after = take_screenshot(window, region)
         return_coords, _ = find_on_screen(get_template(GOLD_RETURN_IMG), screen_after, region)
         my_rudnik_coords, _ = find_on_screen(get_template(GOLD_MY_RUDNIK_IMG), screen_after, region)
@@ -530,22 +528,37 @@ def process_gold(screen_cv, region, last_gold_state, window):
             print("[GOLD] После 'Марш' появился попап SummaryStrenghtText. Обработаем его.")
             return GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE
 
-        if return_coords or my_rudnik_coords:
-            if find_coords is None:
-                start_gold_mission()
-                update_gold_time()
-                print("[GOLD] ✓ Золотодобыча запущена!")
-                return GoldState.COMPLETED
-            else:
-                print("[GOLD] Кнопка поиска всё ещё видна — рудник не занят. Продолжаем поиск.")
+        # Если сразу виден return.png / my_rudnik.png — запуск успешен
+        if (return_coords or my_rudnik_coords) and find_coords is None:
+            start_gold_mission()
+            update_gold_time()
+            print("[GOLD] ✓ Золотодобыча запущена!")
+            return GoldState.COMPLETED
+
+        # Иначе игра ещё обновляет экран. Делаем второй скриншот через 0.5 сек
+        # и проверяем ещё раз, прежде чем считать, что место не занято.
+        time.sleep(0.5)
+        screen_after2 = take_screenshot(window, region)
+        return_coords2, _ = find_on_screen(get_template(GOLD_RETURN_IMG), screen_after2, region)
+        my_rudnik_coords2, _ = find_on_screen(get_template(GOLD_MY_RUDNIK_IMG), screen_after2, region)
+        find_coords2, _ = find_on_screen(get_template(GOLD_FIND_IMG), screen_after2, region)
+
+        if (return_coords2 or my_rudnik_coords2) and find_coords2 is None:
+            start_gold_mission()
+            update_gold_time()
+            print("[GOLD] ✓ Золотодобыча запущена (проверка через 0.5 сек)!")
+            return GoldState.COMPLETED
+
+        if return_coords2 or my_rudnik_coords2:
+            print("[GOLD] Кнопка поиска всё ещё видна — рудник не занят. Продолжаем поиск.")
         else:
             print("[GOLD] Рудник не занят (нет return.png / my_rudnik.png). Продолжаем поиск.")
 
-        work_coords, _ = find_on_screen(get_template(GOLD_WORK_IMG), screen_after, region)
-        go_coords, _ = find_on_screen(get_template(GOLD_GO_IMG), screen_after, region)
+        work_coords, _ = find_on_screen(get_template(GOLD_WORK_IMG), screen_after2, region)
+        go_coords, _ = find_on_screen(get_template(GOLD_GO_IMG), screen_after2, region)
         if work_coords or go_coords:
             print("[GOLD] Застряли в попапе (видны work/go). Закрываем.")
-            find_and_click(GOLD_CLOSE_IMG, screen_after, region)
+            find_and_click(GOLD_CLOSE_IMG, screen_after2, region)
             time.sleep(0.3)
             # После закрытия попапа проверяем, не вернулись ли в rudnik_tab
             screen_after_close = take_screenshot(window, region)
