@@ -590,35 +590,43 @@ def process_gold(screen_cv, region, last_gold_state, window):
 
     # ---- MY RUDNIK / ACTIVE MINING ----
     if current_state in (GoldState.MY_RUDNIK_VISIBLE, GoldState.RAID_LEVEL_ICON_VISIBLE):
-        # Если мы здесь — значит отряд уже добывает. Неважно, распознан ли уровень:
-        # синхронизируем таймер (если needed) и возвращаемся в main.
         current = get_current_level(screen_cv, region)
         if current:
             _gold_ctx['current_mining_level'] = current
 
-        if _gold_ctx.get('recall_requested'):
+        # Если нужно отозвать отряд (время вышло или recall_requested) — открываем детали рудника
+        # кликом по my_rudnik.png, чтобы появились кнопки return.png / finish.png.
+        needs_recall = _gold_ctx.get('recall_requested', False)
+        started = _gold_ctx.get('started_at')
+        if started is not None and (time.time() - started) >= GOLD_MINING_DURATION:
+            print("[GOLD] 45 минут добычи истекли. Открываем детали рудника для отзыва.")
+            needs_recall = True
+            _gold_ctx['recall_requested'] = True
+
+        if needs_recall:
             return_coords, _ = find_on_screen(get_template(GOLD_RETURN_IMG), screen_cv, region)
             if return_coords:
-                print("[GOLD] Отряд занят добычей на этом уровне. Отзываем.")
+                print("[GOLD] Отряд занят добычей. Отзываем.")
                 find_and_click(GOLD_RETURN_IMG, screen_cv, region)
                 return GoldState.RETURN_CONFIRM_VISIBLE
-            # Кнопка отзыва не видна — добыча уже завершена/выбиты. Ждём determine.
-            print("[GOLD] recall_requested, но кнопка отзыва не видна. Ждём определения состояния.")
+            # return.png не видна — открываем детали нашего рудника
+            my_rudnik_coords, _ = find_on_screen(get_template(GOLD_MY_RUDNIK_IMG), screen_cv, region)
+            if my_rudnik_coords:
+                print("[GOLD] Открываем детали рудника (my_rudnik.png).")
+                find_and_click(GOLD_MY_RUDNIK_IMG, screen_cv, region)
+                time.sleep(0.5)
+                return GoldState.UNKNOWN
+            print("[GOLD] recall_requested, но не видно ни return.png, ни my_rudnik.png. Ждём.")
             time.sleep(0.3)
             return GoldState.UNKNOWN
 
-        started = _gold_ctx.get('started_at')
+        # Добыча активна, отзыв не требуется — синхронизируем таймер и выходим
         if started is None:
             _gold_ctx['started_at'] = time.time()
             print("[GOLD] Активная добыча без известного старта. Синхронизация таймера.")
         else:
             elapsed = int(time.time() - started)
             print(f"[GOLD] Добыча активна ({elapsed//60} мин).")
-
-        if (time.time() - _gold_ctx['started_at']) >= GOLD_MINING_DURATION:
-            print("[GOLD] 45 минут добычи истекли. Отзываем отряд.")
-            _gold_ctx['recall_requested'] = True
-            return GoldState.MY_RUDNIK_VISIBLE
 
         update_gold_time()
         return GoldState.COMPLETED
