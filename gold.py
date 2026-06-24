@@ -608,17 +608,12 @@ def process_gold(screen_cv, region, last_gold_state, window):
             started = _gold_ctx.get('started_at')
 
             if started is None:
-                # Время старта неизвестно (например, перезапуск скрипта). Открываем детали рудника,
-                # чтобы увидеть finish.png / return.png и действовать корректно.
-                print("[GOLD] Активная добыча без известного старта. Открываем детали рудника.")
-                _gold_ctx['raid_icon_clicks'] = _gold_ctx.get('raid_icon_clicks', 0) + 1
-                if _gold_ctx['raid_icon_clicks'] > 3:
-                    print("[GOLD] Иконка current_raid_lvl_icon.png не открывает детали. Сброс.")
-                    _gold_ctx['raid_icon_clicks'] = 0
-                    return GoldState.UNKNOWN
-                find_and_click(GOLD_CURRENT_RAID_LEVEL_ICON_IMG, screen_cv, region)
-                time.sleep(GOLD_ACTION_DELAY)
-                return GoldState.RUDNIK_TAB
+                # Время старта неизвестно (например, перезапуск скрипта). Синхронизируем
+                # таймер по текущему моменту: добыча уже активна, пусть продолжает.
+                _gold_ctx['started_at'] = time.time()
+                print("[GOLD] Активная добыча без известного старта. Синхронизация таймера.")
+                update_gold_time()
+                return GoldState.COMPLETED
 
             if (time.time() - started) >= GOLD_MINING_DURATION:
                 print("[GOLD] 45 минут добычи истекли. Отзываем отряд.")
@@ -629,6 +624,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
             update_gold_time()
             return GoldState.COMPLETED
 
+        # Уровень не распознан — пытаемся открыть детали рудника по иконке добычи.
         _gold_ctx['raid_icon_clicks'] = _gold_ctx.get('raid_icon_clicks', 0) + 1
         if _gold_ctx['raid_icon_clicks'] > 3:
             print("[GOLD] Иконка current_raid_lvl_icon.png не открывает детали. Сброс.")
