@@ -624,7 +624,9 @@ def process_gold(screen_cv, region, last_gold_state, window):
             time.sleep(GOLD_ACTION_DELAY)
             return GoldState.SELECT_LEVEL_VISIBLE
 
-        # Уровень не распознан — проверяем select_level с более высоким порогом
+        # Уровень не распознан — проверяем select_level с более высоким порогом.
+        # Если видна кнопка выбора уровня — открываем список, чтобы гарантированно
+        # попасть на GOLD_LEVEL, вместо слепого поиска на неизвестном уровне.
         select_test, _ = find_on_screen(get_template(GOLD_SELECT_LEVEL_IMG), screen_cv, region, threshold=CONFIDENCE_HIGH)
         if select_test is not None:
             print(f"[GOLD] Текущий уровень не распознан, но видна кнопка выбора уровня. Открываем список.")
