@@ -465,9 +465,13 @@ def process_gold(screen_cv, region, last_gold_state, window):
 
     # ---- FINISH BUTTON ----
     if current_state == GoldState.FINISH_VISIBLE:
-        print("[GOLD] Нажимаем 'Завершить' после отзыва отряда.")
+        print("[GOLD] Нажимаем 'Завершить' после отзыва/выбивания отряда.")
         find_and_click(GOLD_FINISH_IMG, screen_cv, region)
+        # Добыча завершена — сбрасываем миссию, чтобы заново искать и сесть на это же место.
+        clear_gold_mission()
         _gold_ctx['need_level_check'] = True
+        _gold_ctx['expected'] = 'rudnik_tab'
+        time.sleep(0.5)
         return GoldState.RUDNIK_TAB
 
     # ---- CONFIRM BUTTON ----
@@ -569,22 +573,39 @@ def process_gold(screen_cv, region, last_gold_state, window):
     if current_state == GoldState.FREE_PLACE_VISIBLE:
         find_and_click(GOLD_FREE_PLACE_IMG, screen_cv, region)
         return GoldState.GRIND_VISIBLE
-
     # ---- MY RUDNIK / ACTIVE MINING ----
     if current_state in (GoldState.MY_RUDNIK_VISIBLE, GoldState.RAID_LEVEL_ICON_VISIBLE):
         if _gold_ctx.get('recall_requested'):
-            find_and_click(GOLD_RETURN_IMG, screen_cv, region)
-            return GoldState.RETURN_CONFIRM_VISIBLE
+            return_coords, _ = find_on_screen(get_template(GOLD_RETURN_IMG), screen_cv, region)
+            if return_coords:
+                print("[GOLD] Отряд занят добычей на этом уровне. Отзываем.")
+                find_and_click(GOLD_RETURN_IMG, screen_cv, region)
+                return GoldState.RETURN_CONFIRM_VISIBLE
+            # Кнопка отзыва не видна — скорее всего добыча уже завершена (нас выбили).
+            # Не возвращаем RETURN_CONFIRM_VISIBLE, пусть determine найдёт finish.png.
+            print("[GOLD] recall_requested, но кнопка отзыва не видна. Ждём определения состояния.")
+            time.sleep(0.3)
+            return GoldState.UNKNOWN
 
         current = get_current_level(screen_cv, region)
         if current:
             _gold_ctx['current_mining_level'] = current
             started = _gold_ctx.get('started_at')
-            if started is None:
-                _gold_ctx['started_at'] = time.time()
-                print("[GOLD] Активная добыча без известного старта. Синхронизация таймера.")
 
-            if (time.time() - _gold_ctx['started_at']) >= GOLD_MINING_DURATION:
+            if started is None:
+                # Время старта неизвестно (например, перезапуск скрипта). Открываем детали рудника,
+                # чтобы увидеть finish.png / return.png и действовать корректно.
+                print("[GOLD] Активная добыча без известного старта. Открываем детали рудника.")
+                _gold_ctx['raid_icon_clicks'] = _gold_ctx.get('raid_icon_clicks', 0) + 1
+                if _gold_ctx['raid_icon_clicks'] > 3:
+                    print("[GOLD] Иконка current_raid_lvl_icon.png не открывает детали. Сброс.")
+                    _gold_ctx['raid_icon_clicks'] = 0
+                    return GoldState.UNKNOWN
+                find_and_click(GOLD_CURRENT_RAID_LEVEL_ICON_IMG, screen_cv, region)
+                time.sleep(GOLD_ACTION_DELAY)
+                return GoldState.RUDNIK_TAB
+
+            if (time.time() - started) >= GOLD_MINING_DURATION:
                 print("[GOLD] 45 минут добычи истекли. Отзываем отряд.")
                 _gold_ctx['recall_requested'] = True
                 return GoldState.MY_RUDNIK_VISIBLE
