@@ -332,9 +332,8 @@ def determine_gold_state(screen_cv, region):
         find_visible, _ = find_on_screen(get_template(GOLD_FIND_IMG), screen_cv, region)
         select_visible, _ = find_on_screen(get_template(GOLD_SELECT_LEVEL_IMG), screen_cv, region)
 
-        # Если find.png виден — мы в режиме поиска, возвращаем FIND_VISIBLE
-        # (даже если no_free_rudnik.png виден — это временное сообщение, ищем дальше)
-        if find_visible:
+        # Если find.png видна и мы уже нажимали find (expected='find') — продолжаем поиск
+        if find_visible and _gold_ctx.get('expected') == 'find':
             return GoldState.FIND_VISIBLE
 
         # Реальная таба рудника: есть find.png или select_level.png
