@@ -322,34 +322,32 @@ def determine_gold_state(screen_cv, region):
     if coords:
         return GoldState.FREE_PLACE_VISIBLE
 
-    # 11. Открыта таба рудника — проверяем ПЕРВЫМ (rudnik_opened.png, find.png, current_lvl_X),
-    #     т.к. select_level.png может ложно сработать на этом экране
+    # 11. Открыта таба рудника.
+    #     rudnik_opened.png может ложно сработать на верхней карусели событий,
+    #     когда открыт попап чужого рудника. Поэтому RUDNIK_TAB определяем
+    #     только если видна кнопка поиска (find.png) или выбора уровня (select_level.png).
     #     НО: если мы только что нажали events.png (expected='events') — пропускаем,
-    #     т.к. select_level.png может ложно сработать на календаре событий
+    #     т.к. select_level.png может ложно сработать на календаре событий.
     if _gold_ctx.get('expected') != 'events':
-        coords, _ = find_on_screen(get_template(GOLD_RUDNIK_OPENED_IMG), screen_cv, region)
-        if coords:
-            return GoldState.RUDNIK_TAB
-
-        current_level = get_current_level(screen_cv, region)
         find_visible, _ = find_on_screen(get_template(GOLD_FIND_IMG), screen_cv, region)
+        select_visible, _ = find_on_screen(get_template(GOLD_SELECT_LEVEL_IMG), screen_cv, region)
 
         # Если find.png виден — мы в режиме поиска, возвращаем FIND_VISIBLE
         # (даже если no_free_rudnik.png виден — это временное сообщение, ищем дальше)
         if find_visible:
             return GoldState.FIND_VISIBLE
 
-        if current_level is not None:
-            # find не виден, но уровень распознан — проверяем no_free_rudnik
-            no_free_coords, _ = find_on_screen(get_template(GOLD_NO_FREE_RUDNIK_IMG), screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
-            if no_free_coords:
-                return GoldState.NO_FREE_RUDNIK
+        # Реальная таба рудника: есть find.png или select_level.png
+        if find_visible or select_visible:
+            current_level = get_current_level(screen_cv, region)
+            if current_level is not None:
+                # find не виден, но уровень распознан — проверяем no_free_rudnik
+                no_free_coords, _ = find_on_screen(get_template(GOLD_NO_FREE_RUDNIK_IMG), screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
+                if no_free_coords:
+                    return GoldState.NO_FREE_RUDNIK
             return GoldState.RUDNIK_TAB
 
         # Список уровней — только если мы не на табе рудника
-        select_visible, _ = find_on_screen(get_template(GOLD_SELECT_LEVEL_IMG), screen_cv, region)
-        if select_visible:
-            return GoldState.SELECT_LEVEL_VISIBLE
         found_level, _ = get_list_level(screen_cv, region, threshold=GOLD_LIST_LEVEL_CONFIDENCE_THRESHOLD)
         if found_level is not None:
             return GoldState.LEVEL_LIST_VISIBLE
@@ -646,8 +644,12 @@ def process_gold(screen_cv, region, last_gold_state, window):
                 _gold_ctx['expected'] = 'find'
                 return GoldState.FIND_VISIBLE
 
-        print("[GOLD] На вкладке рудника нет кнопки поиска. Ждём загрузки.")
-        return GoldState.RUDNIK_TAB
+        # Нет ни find.png, ни select_level.png, ни текущего уровня — это не таба рудника,
+        # а, скорее всего, попап чужого рудника или другой экран. Закрываем его.
+        print("[GOLD] Нет признаков вкладки рудника (find/select/level не найдены). Закрываем попап.")
+        find_and_click(GOLD_CLOSE_IMG, screen_cv, region)
+        _gold_ctx['expected'] = 'rudnik_tab'
+        return GoldState.UNKNOWN
 
     # ---- LEVEL LIST / SELECT LEVEL ----
     if current_state in (GoldState.SELECT_LEVEL_VISIBLE, GoldState.LEVEL_LIST_VISIBLE) \
