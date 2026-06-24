@@ -161,6 +161,23 @@ def is_target_level_in_list(screen_cv, region, target=GOLD_LEVEL, threshold=None
     return coords is not None
 
 
+def find_event_gold_in_calendar(screen_cv, region, threshold=CONFIDENCE_THRESHOLD):
+    """Найти событие золотодобычи в календаре.
+
+    Сначала ищет event_gold.png (иконка/текст рудника). Если не найден —
+    fallback на rudnik.png, т.к. цвет фона строки в календаре меняется
+    (красный/синий/зелёный) и старый шаблон со всей строкой мог не сработать.
+    Возвращает (coords, conf, template_path) или (None, 0.0, None).
+    """
+    coords, conf = find_on_screen(get_template(EVENT_GOLD_IMG), screen_cv, region, threshold=threshold)
+    if coords:
+        return coords, conf, EVENT_GOLD_IMG
+    coords, conf = find_on_screen(get_template(GOLD_RUDNIK_IMG), screen_cv, region, threshold=threshold)
+    if coords:
+        return coords, conf, GOLD_RUDNIK_IMG
+    return None, 0.0, None
+
+
 def click_moveon_for_target_level(screen_cv, region, target=GOLD_LEVEL, lvl_threshold=None, btn_threshold=0.70):
     """Найти ближайшую кнопку 'Перейти' к тексту целевого уровня и кликнуть по ней.
 
@@ -343,8 +360,8 @@ def determine_gold_state(screen_cv, region):
         return GoldState.FORWARD_POPUP_VISIBLE
 
     # 14. Меню событий: видна иконка золотодобычи → можно кликать
-    coords, _ = find_on_screen(get_template(EVENT_GOLD_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
-    if coords:
+    gold_coords, _, _ = find_event_gold_in_calendar(screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+    if gold_coords:
         return GoldState.EVENTS_RUDNIK_VISIBLE
 
     # 15. Главный экран / поселение / карта — проверяем ДО back.png,
@@ -740,9 +757,10 @@ def process_gold(screen_cv, region, last_gold_state, window):
     if current_state == GoldState.EVENTS_RUDNIK_VISIBLE:
         _gold_ctx['expected'] = 'forward_popup'
         _gold_ctx['swipe_count'] = 0
-        clicked, _ = find_and_click(EVENT_GOLD_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
-        if clicked:
-            print("[GOLD] Нажали на иконку золотодобычи в календаре. Ждём попап 'Вперёд'.")
+        gold_coords, gold_conf, gold_template = find_event_gold_in_calendar(screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        if gold_coords:
+            print(f"[GOLD] Нажали на событие золотодобычи ({gold_template}, conf={gold_conf:.3f}). Ждём попап 'Вперёд'.")
+            pyautogui.click(gold_coords[0], gold_coords[1])
             time.sleep(1.0)
             return GoldState.FORWARD_POPUP_VISIBLE
         return GoldState.EVENTS_MENU_OPEN
@@ -764,7 +782,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
         _gold_ctx['expected'] = 'events_scroll'
 
         # Сначала проверим, не появилась ли иконка золотодобычи после предыдущего свайпа
-        gold_coords, _ = find_on_screen(get_template(EVENT_GOLD_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        gold_coords, _, _ = find_event_gold_in_calendar(screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
         if gold_coords:
             _gold_ctx['swipe_count'] = 0
             return GoldState.EVENTS_RUDNIK_VISIBLE
@@ -799,10 +817,10 @@ def process_gold(screen_cv, region, last_gold_state, window):
 
     # ---- MAIN SCREEN ----
     if current_state == GoldState.MAIN_SCREEN:
-        # Проверим, не открыт ли уже календарь (event_gold виден)
-        gold_coords, _ = find_on_screen(get_template(EVENT_GOLD_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        # Проверим, не открыт ли уже календарь (event_gold или rudnik виден)
+        gold_coords, _, _ = find_event_gold_in_calendar(screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
         if gold_coords:
-            print("[GOLD] Календарь уже открыт, иконка золотодобычи видна.")
+            print("[GOLD] Календарь уже открыт, событие золотодобычи видно.")
             _gold_ctx['expected'] = 'events'
             _gold_ctx['swipe_count'] = 0
             return GoldState.EVENTS_RUDNIK_VISIBLE
