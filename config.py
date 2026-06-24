@@ -65,6 +65,8 @@ CALENDAR_IMG = FOLDER + FOLDER_COMMON + 'calendar.png'
 CALENDAR_OPENED_IMG = FOLDER + FOLDER_COMMON + 'calendar_opened.png'
 EVENT_GOLD_IMG = FOLDER + FOLDER_COMMON + 'event_gold.png'
 BOOK_IMG = FOLDER + FOLDER_COMMON + 'book.png'
+ADVENTURE_IMG = FOLDER + FOLDER_COMMON + 'adventure.png'
+ADVENTURE_GET_IMG = FOLDER + FOLDER_COMMON + 'get.png'
 GOLD_CLOSE_IMG = FOLDER + FOLDER_GOLD + 'close.png'  # кнопка закрытия попапов внутри золотодобычи
 
 # Gold
@@ -178,6 +180,9 @@ class HealState(Enum):
     MAIL = "mail"
     HELP_HANDS = "help_hands"
     BOOK = "book"
+    ADVENTURE = "adventure"
+    ADVENTURE_GET = "adventure_get"
+    ADVENTURE_CONFIRM = "adventure_confirm"
     # Быстрое лечение с карты мира
     AMBULANCE_ON_MAP = "ambulance_on_map"
     HEAL_HELP_WITH_TIME = "heal_help_with_time"
