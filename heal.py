@@ -85,7 +85,7 @@ def determine_heal_state(screen_cv, region):
 # ==========================================
 # ОБРАБОТКА СОСТОЯНИЙ ЛЕЧЕНИЯ
 # ==========================================
-def process_heal(screen_cv, region, last_heal_state):
+def process_heal(screen_cv, region, last_heal_state, window=None):
     """
     Обработать текущее состояние лечения.
     Возвращает: новое состояние (HealState или None)
@@ -111,22 +111,52 @@ def process_heal(screen_cv, region, last_heal_state):
 
     if current_state == HealState.BOOK:
         find_and_click(BOOK_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)
-        return None
+        return HealState.MAIN_SCREEN
 
     if current_state == HealState.ADVENTURE:
         print("[HEAL] Нажимаем adventure.png для входа в приключения.")
         find_and_click(ADVENTURE_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)
-        return None
+        if window is None:
+            return None
+        time.sleep(0.5)
+        screen_after = take_screenshot(window, region)
+        get_coords, _ = find_on_screen(get_template(ADVENTURE_GET_IMG), screen_after, region, CONFIDENCE_THRESHOLD)
+        if get_coords:
+            return HealState.ADVENTURE_GET
+        # Похоже, наград нет или экран не изменился — выходим
+        find_and_click(BACK_IMG, screen_after, region)
+        return HealState.UNKNOWN
 
     if current_state == HealState.ADVENTURE_GET:
         print("[HEAL] Нажимаем get.png для сбора приключения.")
         find_and_click(ADVENTURE_GET_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)
-        return None
+        if window is None:
+            return None
+        time.sleep(0.5)
+        screen_after = take_screenshot(window, region)
+        confirm_coords, _ = find_on_screen(get_template(CONFIRM_BUTTON_IMG), screen_after, region, CONFIDENCE_THRESHOLD)
+        if confirm_coords:
+            return HealState.ADVENTURE_CONFIRM
+        # Если get.png всё ещё виден — ещё награды
+        get_coords, _ = find_on_screen(get_template(ADVENTURE_GET_IMG), screen_after, region, CONFIDENCE_THRESHOLD)
+        if get_coords:
+            return HealState.ADVENTURE_GET
+        # Наград больше — выходим
+        find_and_click(BACK_IMG, screen_after, region)
+        return HealState.UNKNOWN
 
     if current_state == HealState.ADVENTURE_CONFIRM:
         print("[HEAL] Подтверждаем награду приключения.")
         find_and_click(CONFIRM_BUTTON_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)
-        return None
+        if window is None:
+            return None
+        time.sleep(0.5)
+        screen_after = take_screenshot(window, region)
+        get_coords, _ = find_on_screen(get_template(ADVENTURE_GET_IMG), screen_after, region, CONFIDENCE_THRESHOLD)
+        if get_coords:
+            return HealState.ADVENTURE_GET
+        find_and_click(BACK_IMG, screen_after, region)
+        return HealState.UNKNOWN
 
     if current_state == HealState.CONFIRM_BUTTON_REQUIRED:
         find_and_click(CONFIRM_BUTTON_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)

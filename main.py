@@ -105,7 +105,7 @@ def main():
             if (current_mode == MainMode.HEAL) or FORCE_HEAL_ONLY:
                 if FORCE_HEAL_ONLY:
                     check_and_click_help_button(screen_cv, region)
-                    last_heal_state = process_heal(screen_cv, region, last_heal_state)
+                    last_heal_state = process_heal(screen_cv, region, last_heal_state, window)
                     # Золото: только если включено и пора — после лечения
                     if GOLD_ENABLED and (should_do_gold() or gold_mission_should_recall()):
                         print("[MAIN] Переключение в режим GOLD (FORCE_HEAL_ONLY)")
@@ -119,12 +119,19 @@ def main():
 
                 # Сначала лечим
                 check_and_click_help_button(screen_cv, region)
-                last_heal_state = process_heal(screen_cv, region, last_heal_state)
+                last_heal_state = process_heal(screen_cv, region, last_heal_state, window)
 
-                # Если process_heal открыл меню лечения, но не нажал кнопку —
-                # продолжаем лечить, не переключаясь в RAID/GOLD
-                if last_heal_state == HealState.HEAL_MENU_OPEN:
-                    print("[MAIN] Меню лечения открыто — продолжаем лечить.")
+                # Если process_heal открыл меню лечения, daily-окна или не завершил обработку —
+                # не переключаемся в RAID/GOLD
+                daily_in_progress_states = {
+                    HealState.HEAL_MENU_OPEN,
+                    HealState.BOOK,
+                    HealState.ADVENTURE,
+                    HealState.ADVENTURE_GET,
+                    HealState.ADVENTURE_CONFIRM,
+                }
+                if last_heal_state in daily_in_progress_states:
+                    print("[MAIN] Обработка лечения/daily ещё не завершена — продолжаем.")
                     continue
 
                 # Ждём закрытия меню лечения и обновляем скриншот
@@ -144,7 +151,7 @@ def main():
                 if heal_menu_open:
                     # Нажимаем кнопку лечения прямо сейчас
                     print("[MAIN] Меню лечения открыто — лечим перед переключением режима.")
-                    last_heal_state = process_heal(screen_cv, region, last_heal_state)
+                    last_heal_state = process_heal(screen_cv, region, last_heal_state, window)
                     time.sleep(0.3)
                     continue
 
