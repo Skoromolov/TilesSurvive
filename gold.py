@@ -541,6 +541,16 @@ def process_gold(screen_cv, region, last_gold_state, window):
         if work_coords or go_coords:
             print("[GOLD] Застряли в попапе (видны work/go). Закрываем.")
             find_and_click(GOLD_CLOSE_IMG, screen_after, region)
+            time.sleep(0.3)
+            # После закрытия попапа проверяем, не вернулись ли в rudnik_tab
+            screen_after_close = take_screenshot(window, region)
+            find_after, _ = find_on_screen(get_template(GOLD_FIND_IMG), screen_after_close, region)
+            select_after, _ = find_on_screen(get_template(GOLD_SELECT_LEVEL_IMG), screen_after_close, region)
+            if find_after or select_after:
+                print("[GOLD] После закрытия попапа вернулись в rudnik_tab. Продолжаем поиск.")
+                _gold_ctx['expected'] = 'rudnik_tab'
+                _gold_ctx['find_started_at'] = None
+                return GoldState.RUDNIK_TAB
 
         _gold_ctx['expected'] = 'rudnik_tab'
         return GoldState.RUDNIK_TAB
@@ -752,8 +762,15 @@ def process_gold(screen_cv, region, last_gold_state, window):
             _gold_ctx['find_started_at'] = None
             find_and_click(GOLD_CLOSE_IMG, screen_cv, region)
             return GoldState.UNKNOWN
-        time.sleep(0.2)
-        find_and_click(GOLD_FIND_IMG, screen_cv, region)
+
+        # Rate-limit: не жмём find.png чаще чем раз в 1.5 сек, иначе игра
+        # не успевает обновить экран и свободное место занимают другие игроки.
+        last_find_click = _gold_ctx.get('find_clicked_at', 0)
+        if time.time() - last_find_click >= 1.5:
+            find_and_click(GOLD_FIND_IMG, screen_cv, region)
+            _gold_ctx['find_clicked_at'] = time.time()
+        else:
+            time.sleep(0.2)
         return GoldState.FIND_VISIBLE
 
     # ---- EVENTS: RUDNIK VISIBLE ----
@@ -783,6 +800,17 @@ def process_gold(screen_cv, region, last_gold_state, window):
     # ---- EVENTS: MENU OPEN, NEED SCROLL ----
     if current_state in (GoldState.EVENTS_MENU_OPEN, GoldState.EVENTS_NEED_SCROLL):
         _gold_ctx['expected'] = 'events_scroll'
+
+        # Если events.png открыло сразу табу рудника (например, последнее событие),
+        # не свайпаем по карусели, а переходим к выбору уровня.
+        rudnik_opened_coords, _ = find_on_screen(get_template(GOLD_RUDNIK_OPENED_IMG), screen_cv, region)
+        find_coords, _ = find_on_screen(get_template(GOLD_FIND_IMG), screen_cv, region)
+        select_coords, _ = find_on_screen(get_template(GOLD_SELECT_LEVEL_IMG), screen_cv, region)
+        if rudnik_opened_coords or find_coords or select_coords:
+            print("[GOLD] Событие золотодобычи уже открыто (rudnik_tab). Пропускаем свайпы.")
+            _gold_ctx['swipe_count'] = 0
+            _gold_ctx['expected'] = 'rudnik_tab'
+            return GoldState.RUDNIK_TAB
 
         # Сначала проверим, не появилась ли иконка золотодобычи после предыдущего свайпа
         gold_coords, _, _ = find_event_gold_in_calendar(screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
