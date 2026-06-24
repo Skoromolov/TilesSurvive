@@ -517,8 +517,9 @@ def process_gold(screen_cv, region, last_gold_state, window):
     # ---- GO / WORK / GRIND ----
     if current_state == GoldState.GO_VISIBLE:
         find_and_click(GOLD_GO_IMG, screen_cv, region)
-        time.sleep(0.2)
-
+        # После "Марш" игра может долго обновлять экран. Ждём, чтобы
+        # корректно определить, успешно ли запустилась добыча.
+        time.sleep(1.0)
         screen_after = take_screenshot(window, region)
         return_coords, _ = find_on_screen(get_template(GOLD_RETURN_IMG), screen_after, region)
         my_rudnik_coords, _ = find_on_screen(get_template(GOLD_MY_RUDNIK_IMG), screen_after, region)
@@ -573,6 +574,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
     if current_state == GoldState.FREE_PLACE_VISIBLE:
         find_and_click(GOLD_FREE_PLACE_IMG, screen_cv, region)
         return GoldState.GRIND_VISIBLE
+
     # ---- MY RUDNIK / ACTIVE MINING ----
     if current_state in (GoldState.MY_RUDNIK_VISIBLE, GoldState.RAID_LEVEL_ICON_VISIBLE):
         if _gold_ctx.get('recall_requested'):
