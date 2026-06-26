@@ -139,8 +139,12 @@ def navigate_to_reid_window():
     if find_and_click(SOUZ_IMG, screen_cv, region, threshold=NAVIGATION_THRESHOLD):
         time.sleep(0.3)
     else:
-        print("[RAID] ✗ Кнопка 'Союз' НЕ найдена")
-        return False
+        # Fallback с пониженным порогом
+        if find_and_click(SOUZ_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD):
+            time.sleep(0.3)
+        else:
+            print("[RAID] ✗ Кнопка 'Союз' НЕ найдена")
+            return False
 
     screen_cv = take_screenshot(window, region)
 
@@ -148,8 +152,12 @@ def navigate_to_reid_window():
         print("[RAID] ✓ Нажата кнопка 'Новости'")
         time.sleep(0.3)
     else:
-        print("[RAID] ✗ Кнопка 'Новости' НЕ найдена")
-        return False
+        if find_and_click(NEWS_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD):
+            print("[RAID] ✓ Нажата кнопка 'Новости' (fallback)")
+            time.sleep(0.3)
+        else:
+            print("[RAID] ✗ Кнопка 'Новости' НЕ найдена")
+            return False
 
     screen_cv = take_screenshot(window, region)
 
@@ -242,14 +250,18 @@ def process_raid(screen_cv, region, last_raid_state, last_join_time, raid_joined
         return None, last_join_time, raid_joined_at_least_once
 
     if current_state == RaidState.NAVIGATION_NEEDED:
-        navigate_to_reid_window()
+        success = navigate_to_reid_window()
+        if not success:
+            print("[RAID] Навигация к рейдам не удалась. Завершаем режим RAID.")
+            return RaidState.RAID_COMPLETED, last_join_time, raid_joined_at_least_once
         return None, last_join_time, raid_joined_at_least_once
 
     if current_state == RaidState.REID_TAB_NOT_ACTIVE:
         found, _ = find_and_click(RAID_NOT_ACTIVE_IMG, screen_cv, region)
         if found:
             return RaidState.REID_WINDOW_ACTIVE, last_join_time, raid_joined_at_least_once
-        return None, last_join_time, raid_joined_at_least_once
+        print("[RAID] Вкладка рейдов не активна и не нажалась. Завершаем режим RAID.")
+        return RaidState.RAID_COMPLETED, last_join_time, raid_joined_at_least_once
 
     if current_state == RaidState.NO_FREE_SPACE:
         clicked, _ = find_and_click(RAID_OK_IMG, screen_cv, region)

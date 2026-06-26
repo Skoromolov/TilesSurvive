@@ -219,7 +219,10 @@ def main():
             # Режим RAID
             elif current_mode == MainMode.RAID:
                 # Защитный таймаут: если режим RAID затянулся на RAID_JOIN_TIMEOUT — возвращаемся к лечению
-                if raid_start_time and (time.time() - raid_start_time) >= RAID_JOIN_TIMEOUT:
+                now = time.time()
+                elapsed = now - raid_start_time if raid_start_time else None
+                print(f"[DEBUG RAID] raid_start_time={raid_start_time}, elapsed={elapsed}, timeout={RAID_JOIN_TIMEOUT}")
+                if raid_start_time and (now - raid_start_time) >= RAID_JOIN_TIMEOUT:
                     print(f"[ТАЙМЕР] Рейд затянулся > {RAID_JOIN_TIMEOUT} сек. Возвращаемся к лечению.")
                     current_mode = MainMode.HEAL
                     last_raid_state = None
