@@ -142,13 +142,25 @@ def process_heal(screen_cv, region, last_heal_state, window=None):
         find_and_click(ADVENTURE_GET_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)
         if window is None:
             return None
-        time.sleep(1.5)
+        time.sleep(2.5)
         screen_after = take_screenshot(window, region)
-        # Попап подтверждения может появиться с задержкой — ищем с пониженным порогом
-        confirm_coords, _ = find_on_screen(get_template(CONFIRM_BUTTON_IMG), screen_after, region, CONFIDENCE_THRESHOLD)
-        if not confirm_coords:
-            confirm_coords, _ = find_on_screen(get_template(CONFIRM_BUTTON_IMG), screen_after, region, 0.60)
+        # Попап подтверждения может появиться с задержкой и выглядеть по-разному
+        confirm_candidates = [
+            (CONFIRM_BUTTON_IMG, CONFIDENCE_THRESHOLD),
+            (GOLD_CONFIRM_IMG, CONFIDENCE_THRESHOLD),
+            (RAID_OK_IMG, CONFIDENCE_THRESHOLD),
+            (CONFIRM_BUTTON_IMG, 0.60),
+            (GOLD_CONFIRM_IMG, 0.60),
+        ]
+        confirm_coords = None
+        confirm_path = None
+        for img_path, thresh in confirm_candidates:
+            confirm_coords, _ = find_on_screen(get_template(img_path), screen_after, region, thresh)
+            if confirm_coords:
+                confirm_path = img_path
+                break
         if confirm_coords:
+            print(f"[HEAL] Найдено подтверждение сбора: {confirm_path}")
             _adventure_get_attempts = 0
             return HealState.ADVENTURE_CONFIRM
         # Если get.png всё ещё виден — ещё награды
@@ -163,10 +175,16 @@ def process_heal(screen_cv, region, last_heal_state, window=None):
     if current_state == HealState.ADVENTURE_CONFIRM:
         print("[HEAL] Подтверждаем награду приключения.")
         _adventure_get_attempts = 0
-        find_and_click(CONFIRM_BUTTON_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)
+        # Пробуем любую известную кнопку подтверждения
+        confirm_clicked = False
+        for img_path in (CONFIRM_BUTTON_IMG, GOLD_CONFIRM_IMG, RAID_OK_IMG):
+            confirm_clicked, _ = find_and_click(img_path, screen_cv, region, 0.60)
+            if confirm_clicked:
+                print(f"[HEAL] Нажато подтверждение: {img_path}")
+                break
         if window is None:
             return None
-        time.sleep(1.5)
+        time.sleep(2.5)
         screen_after = take_screenshot(window, region)
         # После подтверждения может снова появиться get.png (следующая награда)
         get_coords, _ = find_on_screen(get_template(ADVENTURE_GET_IMG), screen_after, region, CONFIDENCE_THRESHOLD)
