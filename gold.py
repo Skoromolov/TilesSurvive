@@ -323,7 +323,13 @@ def determine_gold_state(screen_cv, region):
         return GoldState.WORK_VISIBLE
     coords, _ = find_on_screen(get_template(GOLD_GRIND_IMG), screen_cv, region)
     if coords:
-        return GoldState.GRIND_VISIBLE
+        # grind.png (кирка) ложно срабатывает на табе рудника, где видна кнопка
+        # "Место добычи". Если на том же экране есть find.png или select_level.png —
+        # это таба рудника, а не цепочка добычи.
+        find_visible, _ = find_on_screen(get_template(GOLD_FIND_IMG), screen_cv, region)
+        select_visible, _ = find_on_screen(get_template(GOLD_SELECT_LEVEL_IMG), screen_cv, region)
+        if not (find_visible or select_visible):
+            return GoldState.GRIND_VISIBLE
 
     # 10. Свободное место после поиска
     coords, _ = find_on_screen(get_template(GOLD_FREE_PLACE_IMG), screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
@@ -484,6 +490,16 @@ def process_gold(screen_cv, region, last_gold_state, window):
 
     # ---- CONFIRM BUTTON ----
     if current_state == GoldState.CONFIRM_VISIBLE:
+        # Если бот пытался отозвать отряд, а игра показала попап "СОВЕТ" с
+        # текстом "Чтобы отозвать отряд, необходимо добывать ... в течение 45 мин",
+        # подтверждаем его и выходим в HEAL. Отряд ещё не может быть отозван.
+        if _gold_ctx.get('recall_requested'):
+            print("[GOLD] Подтверждаем попап 'СОВЕТ' (отзыв пока невозможен).")
+            find_and_click(GOLD_CONFIRM_IMG, screen_cv, region)
+            time.sleep(0.3)
+            # Возвращаемся в main, не сбрасывая last_gold_time — отряд продолжает добыву,
+            # и через реальные 45 минут с момента старта бот снова попробует отозвать.
+            return GoldState.COMPLETED
         print("[GOLD] Нажимаем 'Подтвердить'.")
         find_and_click(GOLD_CONFIRM_IMG, screen_cv, region)
         _gold_ctx['need_level_check'] = True
@@ -651,7 +667,8 @@ def process_gold(screen_cv, region, last_gold_state, window):
         else:
             print("[GOLD] Добыча активна, таймер синхронизирован.")
 
-        update_gold_time()
+        # НЕ обновляем last_gold_time здесь: отряд добывает уже некоторое время,
+        # и сброс таймера заставил бы бота пытаться отозвать раньше, чем игра разрешает.
         return GoldState.COMPLETED
 
     # ---- RUDNIK TAB (выбор / поиск уровня) ----
