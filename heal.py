@@ -5,6 +5,8 @@
 from config import *
 from utils import *
 
+# Счётчики защиты от зацикливания
+_adventure_get_attempts = 0
 
 # ==========================================
 # ОПРЕДЕЛЕНИЕ СОСТОЯНИЯ ЛЕЧЕНИЯ
@@ -115,6 +117,8 @@ def process_heal(screen_cv, region, last_heal_state, window=None):
 
     if current_state == HealState.ADVENTURE:
         print("[HEAL] Нажимаем adventure.png для входа в приключения.")
+        global _adventure_get_attempts
+        _adventure_get_attempts = 0
         find_and_click(ADVENTURE_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)
         if window is None:
             return None
@@ -129,6 +133,12 @@ def process_heal(screen_cv, region, last_heal_state, window=None):
 
     if current_state == HealState.ADVENTURE_GET:
         print("[HEAL] Нажимаем get.png для сбора приключения.")
+        _adventure_get_attempts += 1
+        if _adventure_get_attempts > 5:
+            print("[HEAL] Слишком много попыток сбора приключения. Выходим.")
+            _adventure_get_attempts = 0
+            find_and_click(BACK_IMG, screen_cv, region)
+            return HealState.UNKNOWN
         find_and_click(ADVENTURE_GET_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)
         if window is None:
             return None
@@ -136,17 +146,20 @@ def process_heal(screen_cv, region, last_heal_state, window=None):
         screen_after = take_screenshot(window, region)
         confirm_coords, _ = find_on_screen(get_template(CONFIRM_BUTTON_IMG), screen_after, region, CONFIDENCE_THRESHOLD)
         if confirm_coords:
+            _adventure_get_attempts = 0
             return HealState.ADVENTURE_CONFIRM
         # Если get.png всё ещё виден — ещё награды
         get_coords, _ = find_on_screen(get_template(ADVENTURE_GET_IMG), screen_after, region, CONFIDENCE_THRESHOLD)
         if get_coords:
             return HealState.ADVENTURE_GET
         # Наград больше — выходим
+        _adventure_get_attempts = 0
         find_and_click(BACK_IMG, screen_after, region)
         return HealState.UNKNOWN
 
     if current_state == HealState.ADVENTURE_CONFIRM:
         print("[HEAL] Подтверждаем награду приключения.")
+        _adventure_get_attempts = 0
         find_and_click(CONFIRM_BUTTON_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)
         if window is None:
             return None
