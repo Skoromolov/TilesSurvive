@@ -217,15 +217,15 @@ def main():
 
             # Режим RAID
             elif current_mode == MainMode.RAID:
-                # Защитный таймаут: если не удалось присоединиться за RAID_JOIN_TIMEOUT — возвращаемся к лечению
+                # Защитный таймаут: если режим RAID затянулся на RAID_JOIN_TIMEOUT — возвращаемся к лечению
                 if raid_start_time and (time.time() - raid_start_time) >= RAID_JOIN_TIMEOUT:
-                    if not raid_joined_at_least_once:
-                        print(f"[ТАЙМЕР] Не удалось присоединиться к рейду за {RAID_JOIN_TIMEOUT} сек. Возвращаемся к лечению.")
-                        current_mode = MainMode.HEAL
-                        last_raid_state = None
-                        raid_start_time = None
-                        raid_joined_at_least_once = False
-                        continue
+                    print(f"[ТАЙМЕР] Рейд затянулся > {RAID_JOIN_TIMEOUT} сек. Возвращаемся к лечению.")
+                    current_mode = MainMode.HEAL
+                    last_raid_state = None
+                    raid_start_time = None
+                    raid_joined_at_least_once = False
+                    raid_terminal_since = None
+                    continue
 
                 # Если ещё стартуем и не определён state
                 if last_raid_state is None:
