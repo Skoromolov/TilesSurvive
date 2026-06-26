@@ -69,11 +69,19 @@ def gold_mission_active():
 
 def gold_mission_should_recall():
     """Пора отозвать отряд (45 минут прошли)."""
-    if not gold_mission_active():
+    now = time.time()
+    started = _gold_ctx.get('started_at')
+    if started is not None:
+        elapsed = now - started
+        if elapsed >= GOLD_MINING_DURATION:
+            print(f"[GOLD] Добыча идёт {int(elapsed)} сек, порог {GOLD_MINING_DURATION} сек. Нужен отзыв.")
+            _gold_ctx['recall_requested'] = True
+            return True
         return False
-    elapsed = time.time() - _gold_ctx['started_at']
-    if elapsed >= GOLD_MINING_DURATION:
-        print(f"[GOLD] Добыча идёт {int(elapsed)} сек, порог {GOLD_MINING_DURATION} сек. Нужен отзыв.")
+    # Fallback: если started_at сброшен, но с последнего известного золота прошло достаточно времени
+    elapsed_since_last_gold = now - last_gold_time
+    if elapsed_since_last_gold >= GOLD_MINING_DURATION:
+        print(f"[GOLD] started_at утерян, но с последнего золота прошло {int(elapsed_since_last_gold)} сек. Нужен отзыв.")
         _gold_ctx['recall_requested'] = True
         return True
     return False
@@ -598,10 +606,25 @@ def process_gold(screen_cv, region, last_gold_state, window):
         # кликом по my_rudnik.png, чтобы появились кнопки return.png / finish.png.
         needs_recall = _gold_ctx.get('recall_requested', False)
         started = _gold_ctx.get('started_at')
-        if started is not None and (time.time() - started) >= GOLD_MINING_DURATION:
-            print("[GOLD] 45 минут добычи истекли. Открываем детали рудника для отзыва.")
-            needs_recall = True
-            _gold_ctx['recall_requested'] = True
+        now = time.time()
+
+        if started is not None:
+            if (now - started) >= GOLD_MINING_DURATION:
+                print(f"[GOLD] Добыча идёт {int(now - started)} сек, порог {GOLD_MINING_DURATION} сек. Открываем детали рудника для отзыва.")
+                needs_recall = True
+                _gold_ctx['recall_requested'] = True
+        else:
+            # Fallback: started_at утерян — ориентируемся на last_gold_time
+            elapsed_since_last_gold = now - last_gold_time
+            if elapsed_since_last_gold >= GOLD_MINING_DURATION:
+                print(f"[GOLD] started_at утерян, но с последнего золота прошло {int(elapsed_since_last_gold)} сек. Открываем детали для отзыва.")
+                needs_recall = True
+                _gold_ctx['recall_requested'] = True
+            else:
+                # Синхронизируем таймер, но не обновляем last_gold_time,
+                # чтобы следующая проверка recall не зациклилась на "только что синхронизировано".
+                _gold_ctx['started_at'] = now
+                print(f"[GOLD] Активная добыча без известного старта. Синхронизация таймера. До recall по last_gold_time: {int(GOLD_MINING_DURATION - elapsed_since_last_gold)} сек.")
 
         if needs_recall:
             return_coords, _ = find_on_screen(get_template(GOLD_RETURN_IMG), screen_cv, region)
@@ -620,13 +643,13 @@ def process_gold(screen_cv, region, last_gold_state, window):
             time.sleep(0.3)
             return GoldState.UNKNOWN
 
-        # Добыча активна, отзыв не требуется — синхронизируем таймер и выходим
-        if started is None:
-            _gold_ctx['started_at'] = time.time()
-            print("[GOLD] Активная добыча без известного старта. Синхронизация таймера.")
-        else:
+        # Добыча активна, отзыв не требуется — выходим
+        started = _gold_ctx.get('started_at')
+        if started is not None:
             elapsed = int(time.time() - started)
             print(f"[GOLD] Добыча активна ({elapsed//60} мин).")
+        else:
+            print("[GOLD] Добыча активна, таймер синхронизирован.")
 
         update_gold_time()
         return GoldState.COMPLETED
