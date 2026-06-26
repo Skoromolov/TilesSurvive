@@ -12,6 +12,13 @@ from config import *
 from utils import *
 
 
+# Контекст рейда для защиты от зацикливания
+_raid_ctx = {
+    'march_attempts': 0,
+    'last_raid_state': None,
+}
+
+
 # ==========================================
 # ПОДСЧЁТ АТАК
 # ==========================================
@@ -238,6 +245,11 @@ def process_raid(screen_cv, region, last_raid_state, last_join_time, raid_joined
     """
     current_state = determine_raid_state(screen_cv, region)
 
+    # Сбрасываем счётчик попыток марширования при смене состояния
+    if current_state != _raid_ctx.get('last_raid_state'):
+        _raid_ctx['march_attempts'] = 0
+        _raid_ctx['last_raid_state'] = current_state
+
     if current_state != last_raid_state:
         print(f"[RAID] Состояние: {current_state.value}")
 
@@ -311,6 +323,16 @@ def process_raid(screen_cv, region, last_raid_state, last_join_time, raid_joined
 
     if current_state == RaidState.MARCH_VISIBLE:
         screen_cv = take_screenshot(window, region)
+
+        # Защита от зацикливания: максимум 3 попытки клика по Марш
+        _raid_ctx['march_attempts'] = _raid_ctx.get('march_attempts', 0) + 1
+        if _raid_ctx['march_attempts'] > 3:
+            print(f"[RAID] Марш не сработал после {_raid_ctx['march_attempts']-1} попыток. Закрываем попап и продолжаем поиск рейдов.")
+            find_and_click(CLOSE_IMG, screen_cv, region)
+            find_and_click(BACK_IMG, screen_cv, region)
+            _raid_ctx['march_attempts'] = 0
+            return RaidState.NEEDS_SCROLL, time.time(), raid_joined_at_least_once
+
         found2, _ = find_and_click(RAID_MARCH_IMG, screen_cv, region)
         if found2:
             time.sleep(0.5)
@@ -331,6 +353,12 @@ def process_raid(screen_cv, region, last_raid_state, last_join_time, raid_joined
                 find_and_click(RAID_OK_IMG, screen_cv, region)
                 return RaidState.NO_FREE_SPACE, time.time(), True
             return RaidState.RAID_IN_PROGRESS, time.time(), True
+
+        # Кнопка Марш видна, но клик не сработал — пробуем закрыть/вернуться
+        print("[RAID] Кнопка Марш видна, но клик не удался. Закрываем попап.")
+        find_and_click(CLOSE_IMG, screen_cv, region)
+        _raid_ctx['march_attempts'] = 0
+        return RaidState.NEEDS_SCROLL, time.time(), raid_joined_at_least_once
 
     return current_state, last_join_time, raid_joined_at_least_once
 
