@@ -122,7 +122,7 @@ def process_heal(screen_cv, region, last_heal_state, window=None):
         find_and_click(ADVENTURE_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)
         if window is None:
             return None
-        time.sleep(0.5)
+        time.sleep(1.0)
         screen_after = take_screenshot(window, region)
         get_coords, _ = find_on_screen(get_template(ADVENTURE_GET_IMG), screen_after, region, CONFIDENCE_THRESHOLD)
         if get_coords:
@@ -142,9 +142,12 @@ def process_heal(screen_cv, region, last_heal_state, window=None):
         find_and_click(ADVENTURE_GET_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)
         if window is None:
             return None
-        time.sleep(0.5)
+        time.sleep(1.5)
         screen_after = take_screenshot(window, region)
+        # Попап подтверждения может появиться с задержкой — ищем с пониженным порогом
         confirm_coords, _ = find_on_screen(get_template(CONFIRM_BUTTON_IMG), screen_after, region, CONFIDENCE_THRESHOLD)
+        if not confirm_coords:
+            confirm_coords, _ = find_on_screen(get_template(CONFIRM_BUTTON_IMG), screen_after, region, 0.60)
         if confirm_coords:
             _adventure_get_attempts = 0
             return HealState.ADVENTURE_CONFIRM
@@ -163,8 +166,9 @@ def process_heal(screen_cv, region, last_heal_state, window=None):
         find_and_click(CONFIRM_BUTTON_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)
         if window is None:
             return None
-        time.sleep(0.5)
+        time.sleep(1.5)
         screen_after = take_screenshot(window, region)
+        # После подтверждения может снова появиться get.png (следующая награда)
         get_coords, _ = find_on_screen(get_template(ADVENTURE_GET_IMG), screen_after, region, CONFIDENCE_THRESHOLD)
         if get_coords:
             return HealState.ADVENTURE_GET
