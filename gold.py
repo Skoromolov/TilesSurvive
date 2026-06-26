@@ -534,9 +534,18 @@ def process_gold(screen_cv, region, last_gold_state, window):
             _gold_ctx['need_level_check'] = False
             print(f"[GOLD] Уровень проверен: {current}. Продолжаем добычу.")
         else:
-            print("[GOLD] Текущий уровень не виден на экране добычи. Закрываем окно для проверки.")
-            find_and_click(GOLD_CLOSE_IMG, screen_cv, region)
-            return GoldState.UNKNOWN
+            print("[GOLD] Текущий уровень не виден на экране добычи. Пробуем открыть выбор уровня.")
+            clicked_select, _ = find_and_click(GOLD_SELECT_LEVEL_IMG, screen_cv, region)
+            if clicked_select:
+                _gold_ctx['expected'] = 'level_list'
+                _gold_ctx['level_select_scroll_tries'] = 0
+                time.sleep(GOLD_ACTION_DELAY)
+                return GoldState.SELECT_LEVEL_VISIBLE
+            print("[GOLD] select_level.png не найдена. Закрываем окно через close/back для проверки.")
+            clicked_close, _ = find_and_click(GOLD_CLOSE_IMG, screen_cv, region)
+            if not clicked_close:
+                find_and_click(BACK_IMG, screen_cv, region)
+            return GoldState.RUDNIK_TAB
 
     # ---- GO / WORK / GRIND ----
     if current_state == GoldState.GO_VISIBLE:
@@ -702,10 +711,10 @@ def process_gold(screen_cv, region, last_gold_state, window):
             time.sleep(GOLD_ACTION_DELAY)
             return GoldState.SELECT_LEVEL_VISIBLE
 
-        # Уровень не распознан — проверяем select_level с более высоким порогом.
+        # Уровень не распознан — проверяем select_level с рабочим порогом.
         # Если видна кнопка выбора уровня — открываем список, чтобы гарантированно
         # попасть на GOLD_LEVEL, вместо слепого поиска на неизвестном уровне.
-        select_test, _ = find_on_screen(get_template(GOLD_SELECT_LEVEL_IMG), screen_cv, region, threshold=CONFIDENCE_HIGH)
+        select_test, _ = find_on_screen(get_template(GOLD_SELECT_LEVEL_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
         if select_test is not None:
             print(f"[GOLD] Текущий уровень не распознан, но видна кнопка выбора уровня. Открываем список.")
             _gold_ctx['need_level_check'] = True
