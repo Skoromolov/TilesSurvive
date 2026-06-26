@@ -207,6 +207,10 @@ def process_heal(screen_cv, region, last_heal_state, window=None):
             return None
         return HealState.HEAL_ACTIVE
 
+    if current_state == HealState.HEAL_WAIT:
+        print("[HEAL] Лечение в процессе. Ожидаем завершения.")
+        return HealState.HEAL_WAIT
+
     if current_state == HealState.HEAL_MENU_OPEN:
         # Попытка найти и нажать кнопку бесплатного лечения, если доступна
         found, _ = find_and_click(HEAL_FREE_BUTTON_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)

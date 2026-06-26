@@ -121,16 +121,17 @@ def main():
                 check_and_click_help_button(screen_cv, region)
                 last_heal_state = process_heal(screen_cv, region, last_heal_state, window)
 
-                # Если process_heal открыл меню лечения, daily-окна или не завершил обработку —
+                # Если process_heal открыл меню лечения, daily-окна, лечение в процессе или не завершил обработку —
                 # не переключаемся в RAID/GOLD
-                daily_in_progress_states = {
+                heal_in_progress_states = {
                     HealState.HEAL_MENU_OPEN,
+                    HealState.HEAL_WAIT,
                     HealState.BOOK,
                     HealState.ADVENTURE,
                     HealState.ADVENTURE_GET,
                     HealState.ADVENTURE_CONFIRM,
                 }
-                if last_heal_state in daily_in_progress_states:
+                if last_heal_state in heal_in_progress_states:
                     print("[MAIN] Обработка лечения/daily ещё не завершена — продолжаем.")
                     continue
 
