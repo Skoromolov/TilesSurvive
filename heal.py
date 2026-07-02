@@ -286,12 +286,30 @@ def process_heal(screen_cv, region, last_heal_state, window=None):
             return HealState.UNKNOWN
 
     if current_state == HealState.UNKNOWN:
+        # Защита от застревания: счётчик повторных UNKNOWN-состояний
+        if not hasattr(process_heal, '_unknown_stuck_count'):
+            process_heal._unknown_stuck_count = 0
+        process_heal._unknown_stuck_count += 1
+
+        # После 5 безуспешных циклов UNKNOWN — сохраняем скриншот и прекращаем тыкать
+        if process_heal._unknown_stuck_count > 5:
+            print(f"[HEAL] ⚠️ Застряли в UNKNOWN {process_heal._unknown_stuck_count} раз. Сохраняем скриншот, пропускаем действие.")
+            save_debug_screenshot(screen_cv, "unknown_stuck")
+            process_heal._unknown_stuck_count = 0
+            # Пробуем клик по центру экрана — возможно нужно закрыть попап
+            click_x = region[0] + region[2] // 2
+            click_y = region[1] + region[3] // 2
+            pyautogui.click(click_x, click_y)
+            time.sleep(0.5)
+            return HealState.UNKNOWN
+
         try:
             found, _ = find_and_click(VILLAGE_IMG, screen_cv, region)
         except Exception as e:
             print(f"[HEAL] Error in UNKNOWN block (VILLAGE_IMG): {e}")
             found = False
         if found:
+            process_heal._unknown_stuck_count = 0
             return HealState.MAIN_SCREEN
         try:
             found, _ = find_and_click(BACK_IMG, screen_cv, region)
