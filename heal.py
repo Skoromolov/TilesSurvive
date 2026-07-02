@@ -291,66 +291,72 @@ def process_heal(screen_cv, region, last_heal_state, window=None):
             process_heal._unknown_stuck_count = 0
         process_heal._unknown_stuck_count += 1
 
-        # Проверяем ключевые иконки ОДИН раз — если они есть, это не настоящий UNKNOWN
-        key_templates = [
-            WILD_EARTH_IMG,    # Дикие земли - указывает на главный экран
-            EVENTS_IMG,        # События
-            SOUZ_IMG,          # Союз (альтернативная иконка)
-            HEAL_TOWN_IMG,     # Иконка лечения
-            MAIL_IMG,          # Почта
-        ]
-        key_found = False
-        for template_path in key_templates:
-            template = get_template(template_path)
-            if template is not None:
-                coords, conf = find_on_screen(template, screen_cv, region, CONFIDENCE_THRESHOLD)
-                if coords and conf >= CONFIDENCE_THRESHOLD:
-                    key_found = True
-                    break
-
-        # Если ключевые иконки не найдены — мы реально в неизвестном экране
-        if not key_found:
-            # Первый раз — пробуем village, back, close
-            if process_heal._unknown_stuck_count <= 2:
-                try:
-                    found, _ = find_and_click(VILLAGE_IMG, screen_cv, region)
-                except Exception as e:
-                    print(f"[HEAL] Error in UNKNOWN block (VILLAGE_IMG): {e}")
-                    found = False
-                if found:
-                    process_heal._unknown_stuck_count = 0
-                    return HealState.MAIN_SCREEN
-                try:
-                    found, _ = find_and_click(BACK_IMG, screen_cv, region)
-                except Exception as e:
-                    print(f"[HEAL] Error in UNKNOWN block (BACK_IMG): {e}")
-                    found = False
-                if found:
-                    return HealState.UNKNOWN
-                try:
-                    found, _ = find_and_click(CLOSE_IMG, screen_cv, region)
-                except Exception as e:
-                    print(f"[HEAL] Error in UNKNOWN block (CLOSE_IMG): {e}")
-                    found = False
-                if found:
-                    return HealState.UNKNOWN
-
-            # Застряли > 2 раз — сохраняем скриншот и пробуем клик по центру/верху
-            print(f"[HEAL] ⚠️ Застряли в UNKNOWN {process_heal._unknown_stuck_count} раз. Сохраняем скриншот.")
+        # После 5 безуспешных циклов UNKNOWN — сохраняем скриншот и прекращаем тыкать
+        if process_heal._unknown_stuck_count > 5:
+            print(f"[HEAL] ⚠️ Застряли в UNKNOWN {process_heal._unknown_stuck_count} раз. Сохраняем скриншот, пропускаем действие.")
             save_debug_screenshot(screen_cv, "unknown_stuck")
-            # Клик по верхней центральной части экрана (выход из режима редактирования)
+            process_heal._unknown_stuck_count = 0
+            # Пробуем клик по центру экрана — возможно нужно закрыть попап
             click_x = region[0] + region[2] // 2
-            click_y = region[1] + int(region[3] * 0.15)
+            click_y = region[1] + region[3] // 2
             pyautogui.click(click_x, click_y)
-            time.sleep(1)
-            # После 5 раз — сброс счётчика
-            if process_heal._unknown_stuck_count >= 5:
-                process_heal._unknown_stuck_count = 0
-            return None
+            time.sleep(0.5)
+            return HealState.UNKNOWN
 
-        # Ключевые иконки найдены — не UNKNOWN, а нормальный экран
-        process_heal._unknown_stuck_count = 0
-        return HealState.MAIN_SCREEN
+        try:
+            found, _ = find_and_click(VILLAGE_IMG, screen_cv, region)
+        except Exception as e:
+            print(f"[HEAL] Error in UNKNOWN block (VILLAGE_IMG): {e}")
+            found = False
+        if found:
+            process_heal._unknown_stuck_count = 0
+            return HealState.MAIN_SCREEN
+        try:
+            found, _ = find_and_click(BACK_IMG, screen_cv, region)
+        except Exception as e:
+            print(f"[HEAL] Error in UNKNOWN block (BACK_IMG): {e}")
+            found = False
+        if found:
+            return HealState.UNKNOWN
+        try:
+            found, _ = find_and_click(CLOSE_IMG, screen_cv, region)
+        except Exception as e:
+            print(f"[HEAL] Error in UNKNOWN block (CLOSE_IMG): {e}")
+            found = False
+        if found:
+            return HealState.UNKNOWN
+
+    # Защита от перехода в режим редактирования поселения
+    # Если мы не нашли ни одной из ключевых иконок игры, вероятно мы в режиме редактирования
+    # Нужно кликнуть по безопасной области (верхней части экрана) чтобы выйти из этого режима
+    key_icons_found = False
+    # Проверяем наличие ключевых иконок, которые должны быть видимы в нормальном режиме игры
+    key_templates = [
+        WILD_EARTH_IMG,    # Дикие земли - указывает на главный экран
+        EVENTS_IMG,        # События
+        HELP_HANDS_IMG,    # Помощь союзу
+        SOUZ_IMG,          # Союз (альтернативная иконка)
+        HEAL_TOWN_IMG,     # Иконка лечения
+        MAIL_IMG,          # Почта
+    ]
+    
+    for template_path in key_templates:
+        template = get_template(template_path)
+        if template is not None:
+            coords, conf = find_on_screen(template, screen_cv, region, CONFIDENCE_THRESHOLD)
+            if coords and conf >= CONFIDENCE_THRESHOLD:
+                key_icons_found = True
+                break
+    
+    if not key_icons_found:
+        print("[HEAL] ⚠️ Не найдены ключевые иконки игры - возможен переход в режим редактирования поселения")
+        print("[HEAL] Выполняем клик по верхней части экрана для выхода из режима редактирования")
+        # Клик по верхней центральной части экрана (безопасная зона)
+        click_x = region[0] + region[2] // 2  # Центр по X
+        click_y = region[1] + int(region[3] * 0.15)  # 15% от высоты от верхней границы
+        pyautogui.click(click_x, click_y)
+        time.sleep(1)  # Небольшая пауза после клика
+        return None
 
     return HealState.UNKNOWN
 
