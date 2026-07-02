@@ -19,7 +19,7 @@ FOLDER_GOLD = 'gold/'
 # НАСТРОЙКИ РЕЖИМА РАБОТЫ
 # ==========================================
 FORCE_HEAL_ONLY = False   # True = только лечение, False = автопереключение
-FORCE_RAID_ONLY = False   # True = только рейды, False = автопереключение
+FORCE_RAID_ONLY = True   # True = только рейды, False = автопереключение
 
 # ==========================================
 # НАСТРОЙКИ БЫСТРОГО ЛЕЧЕНИЯ С КАРТЫ МИРА
@@ -32,9 +32,9 @@ FAST_HEAL_FROM_MAP_ENABLED = False
 # ==========================================
 # НАСТРОЙКИ ЗОЛОТОДОБЫЧИ
 # ==========================================
-GOLD_ENABLED = True           # True = включить автоматизацию золотодобычи
+GOLD_ENABLED = False           # True = включить автоматизацию золотодобычи
 GOLD_INTERVAL = 2700          # Интервал между успешными золотодобычами (30 минут)
-GOLD_LEVEL = 5                # Уровень рудника 1-6, на котором работаем
+GOLD_LEVEL = 6                # Уровень рудника 1-6, на котором работаем
 # Длительность одной добычи: через сколько секунд отзывать отряд и искать новое место
 GOLD_MINING_DURATION = 2700   # 45 минут — по истечении отзываем отряд и ищем новое место
 GOLD_SEARCH_TIMEOUT = 360     # Таймаут поиска рудника в секундах
@@ -166,9 +166,9 @@ class MainMode(Enum):
 class HealState(Enum):
     UNKNOWN = "unknown"
     MAIN_SCREEN = "main_screen"
-    HEAL_ICON = "heal_icon_visible"
+    HEAL_ICON = "heal_icon"
     HEAL_MENU_OPEN = "heal_menu_open"
-    HEAL_HELP = "heal_help_visible"
+    HEAL_HELP = "heal_help"
     HEAL_ACTIVE = "heal_active"
     RECONNECT_POPUP = "reconnect_popup"
     RECONNECT_REPEAT_POPUP = "reconnect_repeat_popup"
@@ -189,8 +189,8 @@ class HealState(Enum):
 
 class RaidState(Enum):
     UNKNOWN = "unknown"
-    REID_WINDOW_ACTIVE = "reid_window_active"
-    REID_TAB_NOT_ACTIVE = "reid_tab_not_active"
+    RAID_WINDOW_ACTIVE = "raid_window_active"
+    RAID_TAB_NOT_ACTIVE = "raid_tab_not_active"
     PLUS_VISIBLE = "plus_visible"
     MARCH_VISIBLE = "march_visible"
     RAID_IN_PROGRESS = "raid_in_progress"

@@ -208,7 +208,7 @@ def determine_raid_state(screen_cv, region):
     reid_not_active_found = coords_nav is not None
 
     if reid_not_active_found:
-        return RaidState.REID_TAB_NOT_ACTIVE
+        return RaidState.RAID_TAB_NOT_ACTIVE
 
     coords, conf = find_on_screen(get_template(RAID_PLUS_IMG), screen_cv, region, threshold=CONFIDENCE_HIGH)
     plus_found = coords is not None
@@ -268,32 +268,30 @@ def process_raid(screen_cv, region, last_raid_state, last_join_time, raid_joined
             return RaidState.RAID_COMPLETED, last_join_time, raid_joined_at_least_once
         return None, last_join_time, raid_joined_at_least_once
 
-    if current_state == RaidState.REID_TAB_NOT_ACTIVE:
+    if current_state == RaidState.RAID_TAB_NOT_ACTIVE:
         found, _ = find_and_click(RAID_NOT_ACTIVE_IMG, screen_cv, region)
         if found:
-            return RaidState.REID_WINDOW_ACTIVE, last_join_time, raid_joined_at_least_once
+            return RaidState.RAID_WINDOW_ACTIVE, last_join_time, raid_joined_at_least_once
         print("[RAID] Вкладка рейдов не активна и не нажалась. Завершаем режим RAID.")
         return RaidState.RAID_COMPLETED, last_join_time, raid_joined_at_least_once
 
     if current_state == RaidState.NO_FREE_SPACE:
         clicked, _ = find_and_click(RAID_OK_IMG, screen_cv, region)
         if not clicked:
-            find_and_click(BACK_IMG, screen_cv, region)
+            # find_and_click(BACK_IMG, screen_cv, region)
             find_and_click(CLOSE_IMG, screen_cv, region)
-        time.sleep(0.5)
         return RaidState.RAID_COMPLETED, time.time(), raid_joined_at_least_once
 
     if current_state == RaidState.RAID_FULL:
         find_and_click(RAID_OK_IMG, screen_cv, region)
-        time.sleep(0.5)
         return RaidState.RAID_COMPLETED, time.time(), raid_joined_at_least_once
 
-    if current_state == RaidState.NO_REIDS:
-        village_coords, _ = find_on_screen(get_template(VILLAGE_IMG), screen_cv, region)
-        if village_coords:
-            navigate_to_reid_window()
-            return None, last_join_time, raid_joined_at_least_once
-        return RaidState.NO_REIDS, time.time(), raid_joined_at_least_once
+    # if current_state == RaidState.NO_REIDS:
+    #     village_coords, _ = find_on_screen(get_template(VILLAGE_IMG), screen_cv, region)
+    #     if village_coords:
+    #         navigate_to_reid_window()
+    #         return None, last_join_time, raid_joined_at_least_once
+    #     return RaidState.NO_REIDS, time.time(), raid_joined_at_least_once
 
     if current_state == RaidState.NEEDS_SCROLL:
         check_and_scroll_for_attack(screen_cv, region)
@@ -305,25 +303,28 @@ def process_raid(screen_cv, region, last_raid_state, last_join_time, raid_joined
     if current_state == RaidState.PLUS_VISIBLE:
         found, _ = find_and_click(RAID_PLUS_IMG, screen_cv, region)
         if found:
-            time.sleep(0.5)
+            time.sleep(0.3)
             screen_cv = take_screenshot(window, region)
             found2, _ = find_and_click(RAID_MARCH_IMG, screen_cv, region)
             if found2:
-                time.sleep(0.5)
+                time.sleep(0.3)
                 screen_cv = take_screenshot(window, region)
                 no_space_found, _ = find_and_click(RAID_NO_FREE_SPACE_IMG, screen_cv, region)
+                screen_cv = take_screenshot(window, region)
+                ok_found, _ =  find_and_click(RAID_OK_IMG, screen_cv, region)
                 if no_space_found:
-                    time.sleep(0.5)
-                    screen_cv = take_screenshot(window, region)
-                    find_and_click(RAID_OK_IMG, screen_cv, region)
+                    # time.sleep(0.3)
+                    # screen_cv = take_screenshot(window, region)
+                    # find_and_click(RAID_OK_IMG, screen_cv, region)
                     return RaidState.NO_FREE_SPACE, time.time(), True
-                return RaidState.RAID_IN_PROGRESS, time.time(), True
-            return None, last_join_time, raid_joined_at_least_once
+                if ok_found:
+                    return RaidState.RAID_IN_PROGRESS, time.time(), True
+            return RaidState.RAID_IN_PROGRESS, time.time(), True
         return RaidState.NO_REIDS, time.time(), True
 
     if current_state == RaidState.MARCH_VISIBLE:
-        screen_cv = take_screenshot(window, region)
-
+        # screen_cv = take_screenshot(window, region)
+        find_and_click(RAID_MARCH_IMG, screen_cv, region)
         # Защита от зацикливания: максимум 3 попытки клика по Марш
         _raid_ctx['march_attempts'] = _raid_ctx.get('march_attempts', 0) + 1
         if _raid_ctx['march_attempts'] > 3:
@@ -333,26 +334,26 @@ def process_raid(screen_cv, region, last_raid_state, last_join_time, raid_joined
             _raid_ctx['march_attempts'] = 0
             return RaidState.NEEDS_SCROLL, time.time(), raid_joined_at_least_once
 
-        found2, _ = find_and_click(RAID_MARCH_IMG, screen_cv, region)
-        if found2:
-            time.sleep(0.5)
-            screen_cv = take_screenshot(window, region)
+        # found2, _ = find_and_click(RAID_MARCH_IMG, screen_cv, region)
+        # if found2:
+        #     time.sleep(0.3)
+        #     screen_cv = take_screenshot(window, region)
             
             # Check for OK button immediately after marching (e.g., "raid full" confirmation)
-            ok_found, _ = find_and_click(RAID_OK_IMG, screen_cv, region)
-            if ok_found:
-                time.sleep(0.5)
-                screen_cv = take_screenshot(window, region)
-                return RaidState.NO_FREE_SPACE, time.time(), True
+            # ok_found, _ = find_and_click(RAID_OK_IMG, screen_cv, region)
+            # if ok_found:
+            #     time.sleep(0.3)
+            #     screen_cv = take_screenshot(window, region)
+            #     return RaidState.NO_FREE_SPACE, time.time(), True
             
             # Original logic: check for "no free space" popup
-            no_space_found, _ = find_and_click(RAID_NO_FREE_SPACE_IMG, screen_cv, region)
-            if no_space_found:
-                time.sleep(0.5)
-                screen_cv = take_screenshot(window, region)
-                find_and_click(RAID_OK_IMG, screen_cv, region)
-                return RaidState.NO_FREE_SPACE, time.time(), True
-            return RaidState.RAID_IN_PROGRESS, time.time(), True
+            # no_space_found, _ = find_and_click(RAID_NO_FREE_SPACE_IMG, screen_cv, region)
+            # if no_space_found:
+            #     time.sleep(0.3)
+            #     screen_cv = take_screenshot(window, region)
+            #     find_and_click(RAID_OK_IMG, screen_cv, region)
+            #     return RaidState.NO_FREE_SPACE, time.time(), True
+            # return RaidState.RAID_IN_PROGRESS, time.time(), True
 
         # Кнопка Марш видна, но клик не сработал — пробуем закрыть/вернуться
         print("[RAID] Кнопка Марш видна, но клик не удался. Закрываем попап.")

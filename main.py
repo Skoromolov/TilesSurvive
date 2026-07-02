@@ -44,14 +44,11 @@ def main():
     last_heal_state = None
     last_raid_state = None
     last_gold_state = None
-    raid_nav_grace_until = time.time() + 1
     current_mode = MainMode.HEAL
 
-    raid_start_time = None
     raid_joined_at_least_once = False
-    raid_nav_grace_until = 0
     raid_start_time = None
-    raid_terminal_since = None
+
     gold_start_time = None
     gold_exit_state = None
     gold_exiting = False
@@ -61,12 +58,10 @@ def main():
             # Обновить окно и область
             window, region = get_window_region()
             if region is None:
-                time.sleep(5)
+                time.sleep(10)
                 continue
-
             # Активировать окно
             win32gui.SetForegroundWindow(window._hWnd)
-
             # Сделать скриншот
             screen_cv = take_screenshot(window, region)
 
@@ -89,7 +84,6 @@ def main():
             # Режим быстрого лечения с карты мира (высший приоритет, игнорирует всё остальное)
             if FAST_HEAL_FROM_MAP_ENABLED:
                 last_heal_state = process_fast_heal_from_map(screen_cv, region, last_heal_state)
-                time.sleep(1)
                 continue
 
             # Принудительный режим RAID
@@ -97,63 +91,27 @@ def main():
                 current_raid_state = determine_raid_state(screen_cv, region)
                 print(f"[MAIN] Принудительный режим RAID: {current_raid_state.value}")
                 last_raid_state, last_join_time, raid_joined_at_least_once = process_raid(
-                    screen_cv, region, last_raid_state, last_join_time, raid_joined_at_least_once, window
+                    screen_cv, region, last_raid_state, None, raid_joined_at_least_once, window
                 )
                 continue
 
             # Режим HEAL
             if (current_mode == MainMode.HEAL) or FORCE_HEAL_ONLY:
-                if FORCE_HEAL_ONLY:
-                    check_and_click_help_button(screen_cv, region)
-                    last_heal_state = process_heal(screen_cv, region, last_heal_state, window)
-                    # Золото: только если включено и пора — после лечения
-                    if GOLD_ENABLED and (should_do_gold() or gold_mission_should_recall()):
-                        print("[MAIN] Переключение в режим GOLD (FORCE_HEAL_ONLY)")
-                        current_mode = MainMode.GOLD
-                        last_gold_state = None
-                        reset_gold_context()
-                        time.sleep(0.2)
-                        gold_start_time = time.time()
-                        continue
-                    continue
-
-                # Сначала лечим
                 check_and_click_help_button(screen_cv, region)
                 last_heal_state = process_heal(screen_cv, region, last_heal_state, window)
 
-                # Если process_heal открыл меню лечения, daily-окна, лечение в процессе или не завершил обработку —
-                # не переключаемся в RAID/GOLD
-                heal_in_progress_states = {
-                    HealState.HEAL_MENU_OPEN,
-                    HealState.HEAL_WAIT,
-                    HealState.BOOK,
-                    HealState.ADVENTURE,
-                    HealState.ADVENTURE_GET,
-                    HealState.ADVENTURE_CONFIRM,
-                }
-                if last_heal_state in heal_in_progress_states:
-                    print("[MAIN] Обработка лечения/daily ещё не завершена — продолжаем.")
-                    continue
-
-                # Ждём закрытия меню лечения и обновляем скриншот
-                time.sleep(0.5)
-                screen_cv = take_screenshot(window, region)
-
-                # Не переключаемся в RAID/GOLD если меню лечения открыто —
-                # нужно сначала нажать кнопку лечения
-                heal_menu_open = False
-                hb_coords, _ = find_on_screen(get_template(HEAL_BUTTON_IMG), screen_cv, region, threshold=0.60)
-                if hb_coords:
-                    heal_menu_open = True
-                hfb_coords, _ = find_on_screen(get_template(HEAL_FREE_BUTTON_IMG), screen_cv, region, threshold=0.60)
-                if hfb_coords:
-                    heal_menu_open = True
-
-                if heal_menu_open:
-                    # Нажимаем кнопку лечения прямо сейчас
-                    print("[MAIN] Меню лечения открыто — лечим перед переключением режима.")
-                    last_heal_state = process_heal(screen_cv, region, last_heal_state, window)
-                    time.sleep(0.3)
+                if FORCE_HEAL_ONLY:
+                    # check_and_click_help_button(screen_cv, region)
+                    # last_heal_state = process_heal(screen_cv, region, last_heal_state, window)
+                    # # Золото: только если включено и пора — после лечения
+                    # if GOLD_ENABLED and (should_do_gold() or gold_mission_should_recall()):
+                    #     print("[MAIN] Переключение в режим GOLD (FORCE_HEAL_ONLY)")
+                    #     current_mode = MainMode.GOLD
+                    #     last_gold_state = None
+                    #     reset_gold_context()
+                    #     time.sleep(0.2)
+                    #     gold_start_time = time.time()
+                    #     continue
                     continue
 
                 # Потом проверяем рейды
@@ -174,46 +132,19 @@ def main():
                     current_mode = MainMode.GOLD
                     last_gold_state = None
                     reset_gold_context()
-                    time.sleep(0.2)
+                    # time.sleep(0.2)
                     gold_start_time = time.time()
                     continue
-
                 continue
 
             # Режим GOLD
             elif current_mode == MainMode.GOLD:
-                # Защитный таймаут
-                if gold_start_time and (time.time() - gold_start_time) >= GOLD_TIMEOUT:
-                    print(f"[ТАЙМЕР] Золото затянулось > {GOLD_TIMEOUT} сек. Возвращаемся к лечению.")
+                # Обрабатываем режим GOLD через вынесенную функцию
+                result = handle_gold_mode(screen_cv, region, window, last_gold_state, gold_start_time, gold_exit_state, gold_exiting)
+                next_mode, last_gold_state, gold_start_time, gold_exit_state, gold_exiting = result
+                
+                if next_mode == MainMode.HEAL:
                     current_mode = MainMode.HEAL
-                    last_gold_state = None
-                    gold_start_time = None
-                    continue
-
-                # Если ещё стартуем и не определён state
-                if last_gold_state is None:
-                    current_gold_state = determine_gold_state(screen_cv, region)
-                    print(f"[MAIN] GOLD: стартовое состояние {current_gold_state.value}")
-                    last_gold_state = current_gold_state
-
-                # Обработать одно состояние
-                if not gold_exiting:
-                    current_gold_state = determine_gold_state(screen_cv, region)
-                    if current_gold_state != last_gold_state:
-                        if current_gold_state.value:
-                            print(f"[MAIN] GOLD: {current_gold_state.value}")
-                        else:
-                            print(f"[MAIN] GOLD: {current_gold_state}")
-                    last_gold_state = process_gold(screen_cv, region, last_gold_state, window)
-
-                # Если добыча завершена — выходим
-                if last_gold_state == GoldState.COMPLETED:
-                    print("[MAIN] Золотодобыча завершена, возврат к лечению")
-                    current_mode = MainMode.HEAL
-                    last_gold_state = None
-                    gold_exit_state = None
-                    gold_start_time = None
-                    gold_exiting = False
                     continue
 
             # Режим RAID
@@ -247,24 +178,24 @@ def main():
                 )
 
                 # Защита от зависания в NO_FREE_SPACE / NO_REIDS
-                terminal_states = (RaidState.NO_FREE_SPACE, RaidState.NO_REIDS, RaidState.RAID_COMPLETED)
-                if last_raid_state in terminal_states:
-                    if raid_terminal_since is None:
-                        raid_terminal_since = time.time()
-                    elif time.time() - raid_terminal_since > 30:
-                        print("[MAIN] RAID застрял в терминальном состоянии > 30 сек. Клик по центру и возврат к HEAL.")
-                        center_x = region[0] + region[2] // 2
-                        center_y = region[1] + region[3] // 2
-                        pyautogui.click(center_x, center_y)
-                        time.sleep(0.5)
-                        current_mode = MainMode.HEAL
-                        last_raid_state = None
-                        raid_start_time = None
-                        raid_joined_at_least_once = False
-                        raid_terminal_since = None
-                        continue
-                else:
-                    raid_terminal_since = None
+                # terminal_states = (RaidState.NO_FREE_SPACE, RaidState.NO_REIDS, RaidState.RAID_COMPLETED)
+                # if last_raid_state in terminal_states:
+                #     if raid_terminal_since is None:
+                #         raid_terminal_since = time.time()
+                #     elif time.time() - raid_terminal_since > 30:
+                #         print("[MAIN] RAID застрял в терминальном состоянии > 30 сек. Клик по центру и возврат к HEAL.")
+                #         center_x = region[0] + region[2] // 2
+                #         center_y = region[1] + region[3] // 2
+                #         pyautogui.click(center_x, center_y)
+                #         time.sleep(0.5)
+                #         current_mode = MainMode.HEAL
+                #         last_raid_state = None
+                #         raid_start_time = None
+                #         raid_joined_at_least_once = False
+                #         raid_terminal_since = None
+                #         continue
+                # else:
+                #     raid_terminal_since = None
 
                 # Если все рейды завершены — возвращаемся к лечению
                 if last_raid_state == RaidState.RAID_COMPLETED:
@@ -291,7 +222,7 @@ def main():
 
         except Exception as e:
             print(f"[ОШИБКА] {e}")
-            time.sleep(5)
+            time.sleep(10)
 
 
 # ==========================================

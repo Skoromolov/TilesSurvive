@@ -10,7 +10,7 @@ from utils import *
 
 
 # ==========================================
-# ПЕРЕМЕННЫЕ СОСТОЯНИЯ ЗОЛОТА
+# ПЕРЕМЕННЫЕ СОСТОЯНИЙ ЗОЛОТА
 # ==========================================
 last_gold_time = time.time()
 gold_first_run = True         # при первом запуске сразу идём в золото после heal/raid, не ждём GOLD_INTERVAL
@@ -92,7 +92,7 @@ def start_gold_mission():
     _gold_ctx['started_at'] = time.time()
     _gold_ctx['current_mining_level'] = GOLD_LEVEL
     _gold_ctx['recall_requested'] = False
-    print(f"[GOLD] Отряд отправлен на уровень {GOLD_LEVEL} в {time.ctime()}")
+    print(f"[GOTD] Отряд отправлен на уровень {GOLD_LEVEL} в {time.ctime()}")
 
 
 def clear_gold_mission():
@@ -568,30 +568,16 @@ def process_gold(screen_cv, region, last_gold_state, window):
             print("[GOLD] ✓ Золотодобыча запущена!")
             return GoldState.COMPLETED
 
-        # Иначе игра ещё обновляет экран. Делаем второй скриншот через 0.5 сек
-        # и проверяем ещё раз, прежде чем считать, что место не занято.
-        time.sleep(0.5)
-        screen_after2 = take_screenshot(window, region)
-        return_coords2, _ = find_on_screen(get_template(GOLD_RETURN_IMG), screen_after2, region)
-        my_rudnik_coords2, _ = find_on_screen(get_template(GOLD_MY_RUDNIK_IMG), screen_after2, region)
-        find_coords2, _ = find_on_screen(get_template(GOLD_FIND_IMG), screen_after2, region)
-
-        if (return_coords2 or my_rudnik_coords2) and find_coords2 is None:
-            start_gold_mission()
-            update_gold_time()
-            print("[GOLD] ✓ Золотодобыча запущена (проверка через 0.5 сек)!")
-            return GoldState.COMPLETED
-
-        if return_coords2 or my_rudnik_coords2:
+        if return_coords or my_rudnik_coords:
             print("[GOLD] Кнопка поиска всё ещё видна — рудник не занят. Продолжаем поиск.")
         else:
             print("[GOLD] Рудник не занят (нет return.png / my_rudnik.png). Продолжаем поиск.")
 
-        work_coords, _ = find_on_screen(get_template(GOLD_WORK_IMG), screen_after2, region)
-        go_coords, _ = find_on_screen(get_template(GOLD_GO_IMG), screen_after2, region)
+        work_coords, _ = find_on_screen(get_template(GOLD_WORK_IMG), screen_after, region)
+        go_coords, _ = find_on_screen(get_template(GOLD_GO_IMG), screen_after, region)
         if work_coords or go_coords:
             print("[GOLD] Застряли в попапе (видны work/go). Закрываем.")
-            find_and_click(GOLD_CLOSE_IMG, screen_after2, region)
+            find_and_click(GOLD_CLOSE_IMG, screen_after, region)
             time.sleep(0.3)
             # После закрытия попапа проверяем, не вернулись ли в rudnik_tab
             screen_after_close = take_screenshot(window, region)
@@ -1074,3 +1060,44 @@ def process_gold_exit(screen_cv, region, last_exit_state, window):
         return last_exit_state if last_exit_state is not None else GoldState.UNKNOWN
 
     return current_state
+
+
+# ==========================================
+# ОБРАБОТКА РЕЖИMA GOLD В MAIN.LOOP
+# ==========================================
+def handle_gold_mode(screen_cv, region, window, last_gold_state, gold_start_time, gold_exit_state, gold_exiting):
+    """
+    Обрабатывает режим GOLD: определяет состояние и выполняет соответствующие действия.
+
+    Returns:
+        tuple: (next_mode, new_last_gold_state, new_gold_start_time, new_gold_exit_state, new_gold_exiting)
+        где next_mode - MainMode.HEAL или MainMode.GOLD
+    """
+    # Защитный таймаут
+    if gold_start_time and (time.time() - gold_start_time) >= GOLD_TIMEOUT:
+        print(f"[ТАЙМЕР] Золото затянулось > {GOLD_TIMEOUT} сек. Возвращаемся к лечению.")
+        return MainMode.HEAL, None, None, False
+
+    # Если ещё стартуем и не определён state
+    if last_gold_state is None:
+        current_gold_state = determine_gold_state(screen_cv, region)
+        print(f"[MAIN] GOLD: стартовое состояние {current_gold_state.value}")
+        last_gold_state = current_gold_state
+
+    # Обработать одно состояние
+    if not gold_exiting:
+        current_gold_state = determine_gold_state(screen_cv, region)
+        if current_gold_state != last_gold_state:
+            if current_gold_state.value:
+                print(f"[MAIN] GOLD: {current_gold_state.value}")
+            else:
+                print(f"[MAIN] GOLD: {current_gold_state}")
+        last_gold_state = process_gold(screen_cv, region, last_gold_state, window)
+
+    # Если добыча завершена — выходим
+    if last_gold_state == GoldState.COMPLETED:
+        print("[MAIN] Золотодобыча завершена, возврат к лечению")
+        return MainMode.HEAL, None, None, False
+
+    # Если не выходим, остаемся в режиме GOLD
+    return MainMode.GOLD, last_gold_state, gold_start_time, gold_exit_state, gold_exiting
