@@ -29,11 +29,11 @@ def determine_heal_state(screen_cv, region):
     if coords:
         return HealState.FAST_USE_POPUP
 
-    coords, _ = find_on_screen(get_template(HEAL_BUTTON_IMG), screen_cv, region, threshold=0.40)
+    coords, _ = find_on_screen(get_template(HEAL_BUTTON_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if coords:
         return HealState.HEAL_MENU_OPEN
 
-    coords, _ = find_on_screen(get_template(HEAL_FREE_BUTTON_IMG), screen_cv, region, threshold=0.45)
+    coords, _ = find_on_screen(get_template(HEAL_FREE_BUTTON_IMG), screen_cv, region, threshold=NAVIGATION_THRESHOLD)
     if coords:
         return HealState.HEAL_MENU_OPEN
 
@@ -198,42 +198,28 @@ def process_heal(screen_cv, region, last_heal_state, window=None):
         return None
 
     if current_state == HealState.HEAL_ICON:
-        global _heal_town_click_attempts
-        if not hasattr(process_heal, '_heal_town_click_attempts'):
-            process_heal._heal_town_click_attempts = 0
         try:
             found, _ = find_and_click(HEAL_TOWN_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
         except Exception as e:
             print(f"[HEAL] Error in HEAL_ICON: {e}")
             found = False
         if found:
-            process_heal._heal_town_click_attempts += 1
             # Ждём открытия меню лечения и сразу ищем кнопки лечения
             time.sleep(1.0)
             window, region_new = get_window_region()
             if region_new:
                 screen_new = take_screenshot(window, region_new)
-                # Пытаемся нажать бесплатное лечение (порог 0.45 — кнопка может отличаться разрешением)
-                found_free, _ = find_and_click(HEAL_FREE_BUTTON_IMG, screen_new, region_new, 0.45)
+                # Пытаемся нажать бесплатное лечение (порог 0.60 — кнопка может быть частично перекрыта)
+                found_free, _ = find_and_click(HEAL_FREE_BUTTON_IMG, screen_new, region_new, 0.60)
                 if found_free:
                     print("[HEAL] ✓ Бесплатное лечение нажато!")
-                    process_heal._heal_town_click_attempts = 0
                     return HealState.MAIN_SCREEN
-                # Пытаемся нажать обычное лечение (порог 0.40)
-                found_heal, _ = find_and_click(HEAL_BUTTON_IMG, screen_new, region_new, 0.40)
+                # Пытаемся нажать обычное лечение
+                found_heal, _ = find_and_click(HEAL_BUTTON_IMG, screen_new, region_new, CONFIDENCE_THRESHOLD)
                 if found_heal:
                     print("[HEAL] ✓ Обычное лечение нажато!")
-                    process_heal._heal_town_click_attempts = 0
                     return HealState.MAIN_SCREEN
                 print("[HEAL] Меню лечения открыто, но кнопки не найдены.")
-                # Сохраняем debug-скриншот чтобы увидеть что на экране
-                save_debug_screenshot(screen_new, "heal_buttons_not_found")
-                # После 3 безуспешных попыток — закрываем меню и идём дальше
-                if process_heal._heal_town_click_attempts >= 3:
-                    print(f"[HEAL] {process_heal._heal_town_click_attempts} попытки не увенчались успехом. Закрываем меню.")
-                    find_and_click(BACK_IMG, screen_new, region_new)
-                    process_heal._heal_town_click_attempts = 0
-                    return HealState.UNKNOWN
             return HealState.HEAL_MENU_OPEN
         return None
 
@@ -262,18 +248,17 @@ def process_heal(screen_cv, region, last_heal_state, window=None):
 
     if current_state == HealState.HEAL_MENU_OPEN:
         # Попытка найти и нажать кнопку бесплатного лечения, если доступна
-        found, _ = find_and_click(HEAL_FREE_BUTTON_IMG, screen_cv, region, 0.45)
+        found, _ = find_and_click(HEAL_FREE_BUTTON_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)
         if found:
             print("[HEAL] ✓ Бесплатное лечение нажато!")
             return HealState.MAIN_SCREEN
         # Если бесплатное лечение недоступно, используем обычное лечение
-        found, _ = find_and_click(HEAL_BUTTON_IMG, screen_cv, region, 0.40)
+        found, _ = find_and_click(HEAL_BUTTON_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)
         if found:
             print("[HEAL] ✓ Обычное лечение нажато!")
             return HealState.MAIN_SCREEN
         # Если ни одна кнопка не найдена — закрываем меню
         print("[HEAL] Меню лечения открыто, но кнопки не найдены. Закрываем.")
-        save_debug_screenshot(screen_cv, "heal_menu_open_no_buttons")
         find_and_click(BACK_IMG, screen_cv, region)
         return HealState.UNKNOWN
     if current_state == HealState.FAST_USE_POPUP:

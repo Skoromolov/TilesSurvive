@@ -193,11 +193,11 @@ def determine_raid_state(screen_cv, region):
     if coords:
         return RaidState.RECONNECT_REPEAT_POPUP
 
-    coords, _ = find_on_screen(get_template(RAID_FULL_IMG), screen_cv, region, threshold=0.50)
+    coords, _ = find_on_screen(get_template(RAID_FULL_IMG), screen_cv, region)
     if coords:
         return RaidState.RAID_FULL
 
-    coords, _ = find_on_screen(get_template(RAID_NO_FREE_SPACE_IMG), screen_cv, region, threshold=0.50)
+    coords, _ = find_on_screen(get_template(RAID_NO_FREE_SPACE_IMG), screen_cv, region)
     if coords:
         return RaidState.NO_FREE_SPACE
 
@@ -276,24 +276,15 @@ def process_raid(screen_cv, region, last_raid_state, last_join_time, raid_joined
         return RaidState.RAID_COMPLETED, last_join_time, raid_joined_at_least_once
 
     if current_state == RaidState.NO_FREE_SPACE:
-        # Пробуем нажать OK с пониженным порогом (шаблон может не полностью совпадать)
-        clicked, _ = find_and_click(RAID_OK_IMG, screen_cv, region, threshold=0.50)
+        clicked, _ = find_and_click(RAID_OK_IMG, screen_cv, region)
         if not clicked:
-            # Fallback: пробуем close.png
-            clicked, _ = find_and_click(CLOSE_IMG, screen_cv, region, threshold=0.50)
-        if not clicked:
-            # Последняя попытка: back.png
-            find_and_click(BACK_IMG, screen_cv, region, threshold=0.50)
+            find_and_click(BACK_IMG, screen_cv, region)
+            find_and_click(CLOSE_IMG, screen_cv, region)
         time.sleep(0.5)
         return RaidState.RAID_COMPLETED, time.time(), raid_joined_at_least_once
 
     if current_state == RaidState.RAID_FULL:
-        # Пробуем нажать OK с пониженным порогом
-        clicked, _ = find_and_click(RAID_OK_IMG, screen_cv, region, threshold=0.50)
-        if not clicked:
-            clicked, _ = find_and_click(CLOSE_IMG, screen_cv, region, threshold=0.50)
-        if not clicked:
-            find_and_click(BACK_IMG, screen_cv, region, threshold=0.50)
+        find_and_click(RAID_OK_IMG, screen_cv, region)
         time.sleep(0.5)
         return RaidState.RAID_COMPLETED, time.time(), raid_joined_at_least_once
 
@@ -320,24 +311,11 @@ def process_raid(screen_cv, region, last_raid_state, last_join_time, raid_joined
             if found2:
                 time.sleep(0.5)
                 screen_cv = take_screenshot(window, region)
-                # Check for OK button immediately after marching (e.g., "raid full" confirmation)
-                ok_found, _ = find_and_click(RAID_OK_IMG, screen_cv, region, threshold=0.50)
-                if ok_found:
-                    time.sleep(0.5)
-                    return RaidState.NO_FREE_SPACE, time.time(), True
-                # Check for "no free space" popup with lowered threshold
-                no_space_found, _ = find_and_click(RAID_NO_FREE_SPACE_IMG, screen_cv, region, threshold=0.50)
+                no_space_found, _ = find_and_click(RAID_NO_FREE_SPACE_IMG, screen_cv, region)
                 if no_space_found:
                     time.sleep(0.5)
                     screen_cv = take_screenshot(window, region)
-                    find_and_click(RAID_OK_IMG, screen_cv, region, threshold=0.50)
-                    return RaidState.NO_FREE_SPACE, time.time(), True
-                # Check for "raid full" popup with lowered threshold
-                raid_full_found, _ = find_and_click(RAID_FULL_IMG, screen_cv, region, threshold=0.50)
-                if raid_full_found:
-                    time.sleep(0.5)
-                    screen_cv = take_screenshot(window, region)
-                    find_and_click(RAID_OK_IMG, screen_cv, region, threshold=0.50)
+                    find_and_click(RAID_OK_IMG, screen_cv, region)
                     return RaidState.NO_FREE_SPACE, time.time(), True
                 return RaidState.RAID_IN_PROGRESS, time.time(), True
             return None, last_join_time, raid_joined_at_least_once
@@ -361,28 +339,19 @@ def process_raid(screen_cv, region, last_raid_state, last_join_time, raid_joined
             screen_cv = take_screenshot(window, region)
             
             # Check for OK button immediately after marching (e.g., "raid full" confirmation)
-            ok_found, _ = find_and_click(RAID_OK_IMG, screen_cv, region, threshold=0.50)
+            ok_found, _ = find_and_click(RAID_OK_IMG, screen_cv, region)
             if ok_found:
                 time.sleep(0.5)
                 screen_cv = take_screenshot(window, region)
                 return RaidState.NO_FREE_SPACE, time.time(), True
             
-            # Check for "no free space" popup with lowered threshold
-            no_space_found, _ = find_and_click(RAID_NO_FREE_SPACE_IMG, screen_cv, region, threshold=0.50)
+            # Original logic: check for "no free space" popup
+            no_space_found, _ = find_and_click(RAID_NO_FREE_SPACE_IMG, screen_cv, region)
             if no_space_found:
                 time.sleep(0.5)
                 screen_cv = take_screenshot(window, region)
-                find_and_click(RAID_OK_IMG, screen_cv, region, threshold=0.50)
+                find_and_click(RAID_OK_IMG, screen_cv, region)
                 return RaidState.NO_FREE_SPACE, time.time(), True
-            
-            # Check for "raid full" popup with lowered threshold
-            raid_full_found, _ = find_and_click(RAID_FULL_IMG, screen_cv, region, threshold=0.50)
-            if raid_full_found:
-                time.sleep(0.5)
-                screen_cv = take_screenshot(window, region)
-                find_and_click(RAID_OK_IMG, screen_cv, region, threshold=0.50)
-                return RaidState.NO_FREE_SPACE, time.time(), True
-            
             return RaidState.RAID_IN_PROGRESS, time.time(), True
 
         # Кнопка Марш видна, но клик не сработал — пробуем закрыть/вернуться
