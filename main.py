@@ -142,19 +142,30 @@ def main():
                 # Не переключаемся в RAID/GOLD если меню лечения открыто —
                 # нужно сначала нажать кнопку лечения
                 heal_menu_open = False
-                hb_coords, _ = find_on_screen(get_template(HEAL_BUTTON_IMG), screen_cv, region, threshold=0.60)
+                hb_coords, _ = find_on_screen(get_template(HEAL_BUTTON_IMG), screen_cv, region, threshold=0.70)
                 if hb_coords:
                     heal_menu_open = True
-                hfb_coords, _ = find_on_screen(get_template(HEAL_FREE_BUTTON_IMG), screen_cv, region, threshold=0.60)
+                hfb_coords, _ = find_on_screen(get_template(HEAL_FREE_BUTTON_IMG), screen_cv, region, threshold=0.70)
                 if hfb_coords:
                     heal_menu_open = True
 
                 if heal_menu_open:
-                    # Нажимаем кнопку лечения прямо сейчас
-                    print("[MAIN] Меню лечения открыто — лечим перед переключением режима.")
-                    last_heal_state = process_heal(screen_cv, region, last_heal_state, window)
-                    time.sleep(0.3)
-                    continue
+                    # Защита от зацикливания: счётчик попыток лечения
+                    if not hasattr(main, '_heal_menu_tries'):
+                        main._heal_menu_tries = 0
+                    main._heal_menu_tries += 1
+                    if main._heal_menu_tries > 3:
+                        print(f"[MAIN] Лечение не закрывается {main._heal_menu_tries} раз. Закрываем через back и пропускаем.")
+                        find_and_click(BACK_IMG, screen_cv, region)
+                        main._heal_menu_tries = 0
+                        time.sleep(0.5)
+                        # Принудительно проверяем рейды/золото
+                        screen_cv = take_screenshot(window, region)
+                    else:
+                        print("[MAIN] Меню лечения открыто — лечим перед переключением режима.")
+                        last_heal_state = process_heal(screen_cv, region, last_heal_state, window)
+                        time.sleep(0.3)
+                        continue
 
                 # Потом проверяем рейды
                 if check_for_raid_button(screen_cv, region):
