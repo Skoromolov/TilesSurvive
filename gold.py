@@ -7,6 +7,7 @@ import cv2
 
 from config import *
 from utils import *
+from logger import logger  # Импортируем логгер
 
 
 # ==========================================
@@ -43,15 +44,15 @@ def should_do_gold():
         return False
     if gold_first_run:
         gold_first_run = False
-        print("[GOLD] Первый запуск скрипта — сразу запускаем золотодобычу.")
+        logger.info("[GOLD] Первый запуск скрипта — сразу запускаем золотодобычу.")
         return True
     elapsed = time.time() - last_gold_time
     if elapsed >= GOLD_INTERVAL:
-        print(f"[GOLD] Прошло {int(elapsed)} сек с последнего рудника. Пора!")
+        logger.info(f"[GOLD] Прошло {int(elapsed)} сек с последнего рудника. Пора!")
         return True
     remaining = int(GOLD_INTERVAL - elapsed)
     m, s = divmod(remaining, 60)
-    print(f"[GOLD] До рудника: {m:02d}:{s:02d}")
+    logger.debug(f"[GOLD] До рудника: {m:02d}:{s:02d}")
     return False
 
 
@@ -59,7 +60,7 @@ def update_gold_time():
     """Обновить время последнего посещения рудника."""
     global last_gold_time
     last_gold_time = time.time()
-    print(f"[GOLD] Время обновлено: {time.ctime(last_gold_time)}")
+    logger.info(f"[GOLD] Время обновлено: {time.ctime(last_gold_time)}")
 
 
 def gold_mission_active():
@@ -74,14 +75,14 @@ def gold_mission_should_recall():
     if started is not None:
         elapsed = now - started
         if elapsed >= GOLD_MINING_DURATION:
-            print(f"[GOLD] Добыча идёт {int(elapsed)} сек, порог {GOLD_MINING_DURATION} сек. Нужен отзыв.")
+            logger.info(f"[GOLD] Добыча идёт {int(elapsed)} сек, порог {GOLD_MINING_DURATION} сек. Нужен отзыв.")
             _gold_ctx['recall_requested'] = True
             return True
         return False
     # Fallback: если started_at сброшен, но с последнего известного золота прошло достаточно времени
     elapsed_since_last_gold = now - last_gold_time
     if elapsed_since_last_gold >= GOLD_MINING_DURATION:
-        print(f"[GOLD] started_at утерян, но с последнего золота прошло {int(elapsed_since_last_gold)} сек. Нужен отзыв.")
+        logger.info(f"[GOLD] started_at утерян, но с последнего золота прошло {int(elapsed_since_last_gold)} сек. Нужен отзыв.")
         _gold_ctx['recall_requested'] = True
         return True
     return False
@@ -92,7 +93,7 @@ def start_gold_mission():
     _gold_ctx['started_at'] = time.time()
     _gold_ctx['current_mining_level'] = GOLD_LEVEL
     _gold_ctx['recall_requested'] = False
-    print(f"[GOTD] Отряд отправлен на уровень {GOLD_LEVEL} в {time.ctime()}")
+    logger.info(f"[GOLD] Отряд отправлен на уровень {GOLD_LEVEL} в {time.ctime()}")
 
 
 def clear_gold_mission():
@@ -134,7 +135,7 @@ def get_current_level(screen_cv, region, threshold=GOLD_LEVEL_CONFIDENCE_THRESHO
             best_conf = conf
             best_level = level
     if best_level:
-        print(f"[GOLD] Распознан текущий уровень: {best_level} (conf={best_conf:.3f})")
+        logger.debug(f"[GOLD] Распознан текущий уровень: {best_level} (conf={best_conf:.3f})")
     return best_level
 
 
@@ -153,7 +154,7 @@ def get_list_level(screen_cv, region, threshold=GOLD_LIST_LEVEL_CONFIDENCE_THRES
             best_level = level
             best_coords = coords
     if best_level:
-        print(f"[GOLD] В списке найден уровень {best_level} (conf={best_conf:.3f})")
+        logger.debug(f"[GOLD] В списке найден уровень {best_level} (conf={best_conf:.3f})")
         return best_level, best_coords
     return None, None
 
@@ -187,7 +188,7 @@ def find_event_gold_in_calendar(screen_cv, region, threshold=CONFIDENCE_THRESHOL
 
 
 def click_moveon_for_target_level(screen_cv, region, target=GOLD_LEVEL, lvl_threshold=None, btn_threshold=0.70):
-    """Найти ближайшую кнопку 'Перейти' к тексту целевого уровня и кликнуть по ней.
+    """Найть ближайшую кнопку 'Перейти' к тексту целевого уровня и кликнуть по ней.
 
     Если кнопка moveOn.png не найдена, но текст уровня виден, кликает в нижнюю часть
     карточки уровня — это fallback для UI, где кнопка не выделяется как отдельный шаблон.
@@ -201,7 +202,7 @@ def click_moveon_for_target_level(screen_cv, region, target=GOLD_LEVEL, lvl_thre
     h_lvl, w_lvl = lvl_template.shape[:2]
     lvl_matches = find_all_on_screen(lvl_template, screen_cv, region, lvl_threshold)
     if not lvl_matches:
-        print(f"[GOLD] lvl_{target}.png не найден на экране.")
+        logger.debug(f"[GOLD] lvl_{target}.png не найден на экране.")
         return False
 
     btn_template = get_template(GOLD_MOVEON_IMG)
@@ -220,7 +221,7 @@ def click_moveon_for_target_level(screen_cv, region, target=GOLD_LEVEL, lvl_thre
     if btn_template is None:
         if fallback_click:
             pyautogui.click(*fallback_click)
-            print(f"[GOLD] Кнопка 'Перейти' отсутствует как шаблон, клик под уровень {target} ({fallback_x:.0f}, {fallback_y:.0f}), conf={conf_lvl:.3f}")
+            logger.debug(f"[GOLD] Кнопка 'Перейти' отсутствует как шаблон, клик под уровень {target} ({fallback_x:.0f}, {fallback_y:.0f}), conf={conf_lvl:.3f}")
             return True
         return False
 
@@ -243,7 +244,7 @@ def click_moveon_for_target_level(screen_cv, region, target=GOLD_LEVEL, lvl_thre
                         best_pair = (cx_btn, cy_btn, conf_btn, cx_lvl_i, cy_lvl_i, conf_lvl_i)
 
     if best_pair is None:
-        print(f"[GOLD] Кнопка 'Перейти' не найдена рядом с уровнем {target}. "
+        logger.debug(f"[GOLD] Кнопка 'Перейти' не найдена рядом с уровнем {target}. "
               f"lvl_matches={len(lvl_matches)}, btn_matches={len(btn_matches) if btn_matches else 0}. "
               f"Возможно уровень {target} за пределами экрана — нужен скролл.")
         return False
@@ -254,13 +255,13 @@ def click_moveon_for_target_level(screen_cv, region, target=GOLD_LEVEL, lvl_thre
     if btn_top < region_top + 20 or btn_bottom > region_bottom - 20:
         if fallback_click:
             pyautogui.click(*fallback_click)
-            print(f"[GOLD] Кнопка 'Перейти' у уровня {target} частично за краем, клик под карточку ({fallback_x:.0f}, {fallback_y:.0f})")
+            logger.debug(f"[GOLD] Кнопка 'Перейти' у уровня {target} частично за краем, клик под карточку ({fallback_x:.0f}, {fallback_y:.0f})")
             return True
-        print(f"[GOLD] Кнопка 'Перейти' у уровня {target} частично за краем экрана. Скроллим.")
+        logger.debug(f"[GOLD] Кнопка 'Перейти' у уровня {target} частично за краем экрана. Скроллим.")
         return False
 
     pyautogui.click(cx_btn, cy_btn)
-    print(f"[GOLD] Нажата 'Перейти' у уровня {target} ({cx_btn:.0f}, {cy_btn:.0f}), conf=({conf_lvl:.3f}/{conf_btn:.3f})")
+    logger.debug(f"[GOLD] Нажата 'Перейти' у уровня {target} ({cx_btn:.0f}, {cy_btn:.0f}), conf=({conf_lvl:.3f}/{conf_btn:.3f})")
     return True
 
 
@@ -443,7 +444,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
     current_state = determine_gold_state(screen_cv, region)
 
     if current_state != last_gold_state:
-        print(f"[GOLD] Состояние: {current_state.value}")
+        logger.debug(f"[GOLD] Состояние: {current_state.value}")
         save_debug_screenshot(screen_cv, f"gold_{current_state.value}")
 
     # ---- RECONNECT ----
@@ -457,7 +458,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
     # ---- RETURN BUTTON ----
     if current_state == GoldState.RETURN_BUTTON_VISIBLE:
         if _gold_ctx.get('recall_requested'):
-            print("[GOLD] Отряд занят добычей на этом уровне. Отзываем.")
+            logger.info("[GOLD] Отряд занят добычей на этом уровне. Отзываем.")
             find_and_click(GOLD_RETURN_IMG, screen_cv, region)
             return GoldState.RETURN_CONFIRM_VISIBLE
         current = get_current_level(screen_cv, region)
@@ -465,7 +466,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
             _gold_ctx['current_mining_level'] = current
         start_gold_mission()
         update_gold_time()
-        print("[GOLD] ✓ Золотодобыча запущена (return.png видна, отзыв не требуется).")
+        logger.info("[GOLD] ✓ Золотодобыча запущена (return.png видна, отзыв не требуется).")
         return GoldState.COMPLETED
 
     # ---- RETURN CONFIRM ----
@@ -474,12 +475,12 @@ def process_gold(screen_cv, region, last_gold_state, window):
         clear_gold_mission()
         _gold_ctx['expected'] = 'rudnik_tab'
         _gold_ctx['need_level_check'] = True
-        print("[GOLD] Отряд отозван.")
+        logger.info("[GOLD] Отряд отозван.")
         return GoldState.RUDNIK_TAB
 
     # ---- FINISH BUTTON ----
     if current_state == GoldState.FINISH_VISIBLE:
-        print("[GOLD] Нажимаем 'Завершить' после отзыва/выбивания отряда.")
+        logger.info("[GOLD] Нажимаем 'Завершить' после отзыва/выбивания отряда.")
         find_and_click(GOLD_FINISH_IMG, screen_cv, region)
         # Добыча завершена — сбрасываем миссию, чтобы заново искать и сесть на это же место.
         clear_gold_mission()
@@ -494,13 +495,13 @@ def process_gold(screen_cv, region, last_gold_state, window):
         # текстом "Чтобы отозвать отряд, необходимо добывать ... в течение 45 мин",
         # подтверждаем его и выходим в HEAL. Отряд ещё не может быть отозван.
         if _gold_ctx.get('recall_requested'):
-            print("[GOLD] Подтверждаем попап 'СОВЕТ' (отзыв пока невозможен).")
+            logger.info("[GOLD] Подтверждаем попап 'СОВЕТ' (отзыв пока невозможен).")
             find_and_click(GOLD_CONFIRM_IMG, screen_cv, region)
             time.sleep(0.3)
             # Возвращаемся в main, не сбрасывая last_gold_time — отряд продолжает добыву,
             # и через реальные 45 минут с момента старта бот снова попробует отозвать.
             return GoldState.COMPLETED
-        print("[GOLD] Нажимаем 'Подтвердить'.")
+        logger.info("[GOLD] Нажимаем 'Подтвердить'.")
         find_and_click(GOLD_CONFIRM_IMG, screen_cv, region)
         _gold_ctx['need_level_check'] = True
         return GoldState.RUDNIK_TAB
@@ -509,10 +510,10 @@ def process_gold(screen_cv, region, last_gold_state, window):
     if current_state == GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE:
         join_coords, _ = find_on_screen(get_template(GOLD_WORK_IMG), screen_cv, region)
         if join_coords:
-            print("[GOLD] Найдена кнопка присоединения/добычи. Нажимаем.")
+            logger.info("[GOLD] Найдена кнопка присоединения/добычи. Нажимаем.")
             find_and_click(GOLD_WORK_IMG, screen_cv, region)
             return GoldState.WORK_VISIBLE
-        print("[GOLD] Место занято (SummaryStrenghtText). Закрываем попап.")
+        logger.info("[GOLD] Место занято (SummaryStrenghtText). Закрываем попап.")
         find_and_click(GOLD_CLOSE_IMG, screen_cv, region)
         _gold_ctx['expected'] = 'rudnik_tab'
         return GoldState.RUDNIK_TAB
@@ -524,7 +525,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
     ):
         current = get_current_level(screen_cv, region)
         if current is not None and current != GOLD_LEVEL:
-            print(f"[GOLD] Уровень {current}, нужен {GOLD_LEVEL}. Открываем выбор уровня перед добычей.")
+            logger.info(f"[GOLD] Уровень {current}, нужен {GOLD_LEVEL}. Открываем выбор уровня перед добычей.")
             find_and_click(GOLD_SELECT_LEVEL_IMG, screen_cv, region)
             _gold_ctx['expected'] = 'level_list'
             _gold_ctx['level_select_scroll_tries'] = 0
@@ -532,16 +533,16 @@ def process_gold(screen_cv, region, last_gold_state, window):
             return GoldState.SELECT_LEVEL_VISIBLE
         elif current == GOLD_LEVEL:
             _gold_ctx['need_level_check'] = False
-            print(f"[GOLD] Уровень проверен: {current}. Продолжаем добычу.")
+            logger.info(f"[GOLD] Уровень проверен: {current}. Продолжаем добычу.")
         else:
-            print("[GOLD] Текущий уровень не виден на экране добычи. Пробуем открыть выбор уровня.")
+            logger.info("[GOLD] Текущий уровень не виден на экране добычи. Пробуем открыть выбор уровня.")
             clicked_select, _ = find_and_click(GOLD_SELECT_LEVEL_IMG, screen_cv, region)
             if clicked_select:
                 _gold_ctx['expected'] = 'level_list'
                 _gold_ctx['level_select_scroll_tries'] = 0
                 time.sleep(GOLD_ACTION_DELAY)
                 return GoldState.SELECT_LEVEL_VISIBLE
-            print("[GOLD] select_level.png не найдена. Закрываем окно через close/back для проверки.")
+            logger.info("[GOLD] select_level.png не найдена. Закрываем окно через close/back для проверки.")
             clicked_close, _ = find_and_click(GOLD_CLOSE_IMG, screen_cv, region)
             if not clicked_close:
                 find_and_click(BACK_IMG, screen_cv, region)
@@ -558,25 +559,25 @@ def process_gold(screen_cv, region, last_gold_state, window):
         summary_coords, _ = find_on_screen(get_template(GOLD_SUMMARY_STRENGTH_TEXT_IMG), screen_after, region)
 
         if summary_coords:
-            print("[GOLD] После 'Марш' появился попап SummaryStrenghtText. Обработаем его.")
+            logger.info("[GOLD] После 'Марш' появился попап SummaryStrenghtText. Обработаем его.")
             return GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE
 
         # Если сразу виден return.png / my_rudnik.png — запуск успешен
         if (return_coords or my_rudnik_coords) and find_coords is None:
             start_gold_mission()
             update_gold_time()
-            print("[GOLD] ✓ Золотодобыча запущена!")
+            logger.info("[GOLD] ✓ Золотодобыча запущена!")
             return GoldState.COMPLETED
 
         if return_coords or my_rudnik_coords:
-            print("[GOLD] Кнопка поиска всё ещё видна — рудник не занят. Продолжаем поиск.")
+            logger.info("[GOLD] Кнопка поиска всё ещё видна — рудник не занят. Продолжаем поиск.")
         else:
-            print("[GOLD] Рудник не занят (нет return.png / my_rudnik.png). Продолжаем поиск.")
+            logger.info("[GOLD] Рудник не занят (нет return.png / my_rudnik.png). Продолжаем поиск.")
 
         work_coords, _ = find_on_screen(get_template(GOLD_WORK_IMG), screen_after, region)
         go_coords, _ = find_on_screen(get_template(GOLD_GO_IMG), screen_after, region)
         if work_coords or go_coords:
-            print("[GOLD] Застряли в попапе (видны work/go). Закрываем.")
+            logger.info("[GOLD] Застряли в попапе (видны work/go). Закрываем.")
             find_and_click(GOLD_CLOSE_IMG, screen_after, region)
             time.sleep(0.3)
             # После закрытия попапа проверяем, не вернулись ли в rudnik_tab
@@ -584,7 +585,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
             find_after, _ = find_on_screen(get_template(GOLD_FIND_IMG), screen_after_close, region)
             select_after, _ = find_on_screen(get_template(GOLD_SELECT_LEVEL_IMG), screen_after_close, region)
             if find_after or select_after:
-                print("[GOLD] После закрытия попапа вернулись в rudnik_tab. Продолжаем поиск.")
+                logger.info("[GOLD] После закрытия попапа вернулись в rudnik_tab. Продолжаем поиск.")
                 _gold_ctx['expected'] = 'rudnik_tab'
                 _gold_ctx['find_started_at'] = None
                 return GoldState.RUDNIK_TAB
@@ -609,7 +610,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
         # нераспознанного current_lvl_X приводит к бесконечному циклу выбора уровня.
         current = get_current_level(screen_cv, region)
         if current is not None and current != GOLD_LEVEL:
-            print(f"[GOLD] Уровень {current}, нужен {GOLD_LEVEL}. Открываем выбор уровня перед добычей.")
+            logger.info(f"[GOLD] Уровень {current}, нужен {GOLD_LEVEL}. Открываем выбор уровня перед добычей.")
             find_and_click(GOLD_SELECT_LEVEL_IMG, screen_cv, region)
             _gold_ctx['expected'] = 'level_list'
             _gold_ctx['level_select_scroll_tries'] = 0
@@ -617,9 +618,9 @@ def process_gold(screen_cv, region, last_gold_state, window):
             return GoldState.SELECT_LEVEL_VISIBLE
         if current == GOLD_LEVEL:
             _gold_ctx['need_level_check'] = False
-            print(f"[GOLD] Уровень проверен: {current}. Продолжаем добычу.")
+            logger.info(f"[GOLD] Уровень проверен: {current}. Продолжаем добычу.")
         else:
-            print("[GOLD] Текущий уровень не виден на экране добычи. Доверяемся текущему уровню и продолжаем.")
+            logger.info("[GOLD] Текущий уровень не виден на экране добычи. Доверяемся текущему уровню и продолжаем.")
 
         find_and_click(GOLD_FREE_PLACE_IMG, screen_cv, region)
         return GoldState.GRIND_VISIBLE
@@ -638,36 +639,36 @@ def process_gold(screen_cv, region, last_gold_state, window):
 
         if started is not None:
             if (now - started) >= GOLD_MINING_DURATION:
-                print(f"[GOLD] Добыча идёт {int(now - started)} сек, порог {GOLD_MINING_DURATION} сек. Открываем детали рудника для отзыва.")
+                logger.info(f"[GOLD] Добыча идёт {int(now - started)} сек, порог {GOLD_MINING_DURATION} сек. Открываем детали рудника для отзыва.")
                 needs_recall = True
                 _gold_ctx['recall_requested'] = True
         else:
             # Fallback: started_at утерян — ориентируемся на last_gold_time
             elapsed_since_last_gold = now - last_gold_time
             if elapsed_since_last_gold >= GOLD_MINING_DURATION:
-                print(f"[GOLD] started_at утерян, но с последнего золота прошло {int(elapsed_since_last_gold)} сек. Открываем детали для отзыва.")
+                logger.info(f"[GOLD] started_at утерян, но с последнего золота прошло {int(elapsed_since_last_gold)} сек. Открываем детали для отзыва.")
                 needs_recall = True
                 _gold_ctx['recall_requested'] = True
             else:
                 # Синхронизируем таймер, но не обновляем last_gold_time,
                 # чтобы следующая проверка recall не зациклилась на "только что синхронизировано".
                 _gold_ctx['started_at'] = now
-                print(f"[GOLD] Активная добыча без известного старта. Синхронизация таймера. До recall по last_gold_time: {int(GOLD_MINING_DURATION - elapsed_since_last_gold)} сек.")
+                logger.info(f"[GOLD] Активная добыча без известного старта. Синхронизация таймера. До recall по last_gold_time: {int(GOLD_MINING_DURATION - elapsed_since_last_gold)} сек.")
 
         if needs_recall:
             return_coords, _ = find_on_screen(get_template(GOLD_RETURN_IMG), screen_cv, region)
             if return_coords:
-                print("[GOLD] Отряд занят добычей. Отзываем.")
+                logger.info("[GOLD] Отряд занят добычей. Отзываем.")
                 find_and_click(GOLD_RETURN_IMG, screen_cv, region)
                 return GoldState.RETURN_CONFIRM_VISIBLE
             # return.png не видна — открываем детали нашего рудника
             my_rudnik_coords, _ = find_on_screen(get_template(GOLD_MY_RUDNIK_IMG), screen_cv, region)
             if my_rudnik_coords:
-                print("[GOLD] Открываем детали рудника (my_rudnik.png).")
+                logger.info("[GOLD] Открываем детали рудника (my_rudnik.png).")
                 find_and_click(GOLD_MY_RUDNIK_IMG, screen_cv, region)
                 time.sleep(0.5)
                 return GoldState.UNKNOWN
-            print("[GOLD] recall_requested, но не видно ни return.png, ни my_rudnik.png. Ждём.")
+            logger.info("[GOLD] recall_requested, но не видно ни return.png, ни my_rudnik.png. Ждём.")
             time.sleep(0.3)
             return GoldState.UNKNOWN
 
@@ -675,9 +676,9 @@ def process_gold(screen_cv, region, last_gold_state, window):
         started = _gold_ctx.get('started_at')
         if started is not None:
             elapsed = int(time.time() - started)
-            print(f"[GOLD] Добыча активна ({elapsed//60} мин).")
+            logger.info(f"[GOLD] Добыча активна ({elapsed//60} мин).")
         else:
-            print("[GOLD] Добыча активна, таймер синхронизирован.")
+            logger.info("[GOLD] Добыча активна, таймер синхронизирован.")
 
         # НЕ обновляем last_gold_time здесь: отряд добывает уже некоторое время,
         # и сброс таймера заставил бы бота пытаться отозвать раньше, чем игра разрешает.
@@ -696,18 +697,18 @@ def process_gold(screen_cv, region, last_gold_state, window):
         if current == GOLD_LEVEL:
             _gold_ctx['need_level_check'] = False
             if find_test is not None:
-                print(f"[GOLD] Уровень {current} — целевой. Ищем свободный рудник.")
+                logger.info(f"[GOLD] Уровень {current} — целевой. Ищем свободный рудник.")
                 clicked_find, _ = find_and_click(GOLD_FIND_IMG, screen_cv, region)
                 if clicked_find:
                     _gold_ctx['expected'] = 'find'
                     return GoldState.FIND_VISIBLE
-            print(f"[GOLD] На уровне {current}, но кнопка поиска не найдена. Ждём.")
+            logger.info(f"[GOLD] На уровне {current}, но кнопка поиска не найдена. Ждём.")
             return GoldState.RUDNIK_TAB
 
         # Если текущий уровень распознан и НЕ равен GOLD_LEVEL — открываем выбор уровня
         if current is not None and current != GOLD_LEVEL:
             _gold_ctx['need_level_check'] = True
-            print(f"[GOLD] Уровень {current}, нужен {GOLD_LEVEL}. Открываем выбор уровня.")
+            logger.info(f"[GOLD] Уровень {current}, нужен {GOLD_LEVEL}. Открываем выбор уровня.")
             find_and_click(GOLD_SELECT_LEVEL_IMG, screen_cv, region)
             _gold_ctx['expected'] = 'level_list'
             _gold_ctx['level_select_scroll_tries'] = 0
@@ -718,7 +719,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
         # После отзыва мы остаёмся на том же уровне; открытие select_level из-за
         # нераспознанного current_lvl_X приводит к бесконечному циклу выбора уровня.
         if find_test is not None:
-            print("[GOLD] Уровень не распознан, но кнопка поиска видна. Ищем свободный рудник.")
+            logger.info("[GOLD] Уровень не распознан, но кнопка поиска видна. Ищем свободный рудник.")
             clicked_find, _ = find_and_click(GOLD_FIND_IMG, screen_cv, region)
             if clicked_find:
                 _gold_ctx['expected'] = 'find'
@@ -728,7 +729,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
         # Уровень не распознан и find.png нет — тогда уже открываем выбор уровня
         select_test, _ = find_on_screen(get_template(GOLD_SELECT_LEVEL_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
         if select_test is not None:
-            print(f"[GOLD] Текущий уровень не распознан, find.png не видна. Открываем список уровней.")
+            logger.info(f"[GOLD] Текущий уровень не распознан, find.png не видна. Открываем список уровней.")
             _gold_ctx['need_level_check'] = True
             find_and_click(GOLD_SELECT_LEVEL_IMG, screen_cv, region)
             _gold_ctx['expected'] = 'level_list'
@@ -738,7 +739,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
 
         # Нет ни find.png, ни select_level.png, ни текущего уровня — это не таба рудника,
         # а, скорее всего, попап чужого рудника или другой экран. Закрываем его.
-        print("[GOLD] Нет признаков вкладки рудника (find/select/level не найдены). Закрываем попап.")
+        logger.info("[GOLD] Нет признаков вкладки рудника (find/select/level не найдены). Закрываем попап.")
         find_and_click(GOLD_CLOSE_IMG, screen_cv, region)
         _gold_ctx['expected'] = 'rudnik_tab'
         return GoldState.UNKNOWN
@@ -751,10 +752,10 @@ def process_gold(screen_cv, region, last_gold_state, window):
         # Если видно сообщение "нет свободных рудников", пробуем соседний уровень
         no_free_coords, no_free_conf = find_on_screen(get_template(GOLD_NO_FREE_RUDNIK_IMG), screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
         if no_free_coords:
-            print(f"[GOLD] На целевом уровне нет свободных мест (conf={no_free_conf:.3f}). Пробуем другой уровень.")
+            logger.info(f"[GOLD] На целевом уровне нет свободных мест (conf={no_free_conf:.3f}). Пробуем другой уровень.")
             _gold_ctx['level_select_scroll_tries'] = _gold_ctx.get('level_select_scroll_tries', 0) + 1
             if _gold_ctx['level_select_scroll_tries'] > 10:
-                print("[GOLD] Везде занято. Завершаем золотодобычу.")
+                logger.info("[GOLD] Везде занято. Завершаем золотодобычу.")
                 _gold_ctx['level_select_scroll_tries'] = 0
                 update_gold_time()
                 return GoldState.COMPLETED
@@ -763,7 +764,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
             alternative = max(1, min(6, alternative))
             if is_target_level_in_list(screen_cv, region, target=alternative):
                 if click_moveon_for_target_level(screen_cv, region, target=alternative):
-                    print(f"[GOLD] Пробуем уровень {alternative} вместо {GOLD_LEVEL}.")
+                    logger.info(f"[GOLD] Пробуем уровень {alternative} вместо {GOLD_LEVEL}.")
                     _gold_ctx['expected'] = 'rudnik_tab'
                     _gold_ctx['need_level_check'] = True
                     time.sleep(GOLD_ACTION_DELAY)
@@ -783,7 +784,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
                 time.sleep(1.0)  # Ждём загрузки табы рудника после "Перейти"
                 return GoldState.RUDNIK_TAB
             # Кнопка "Перейти" не найдена рядом с уровнем — скроллим чтобы уровкть кнопку
-            print(f"[GOLD] Уровень {GOLD_LEVEL} виден, но кнопка 'Перейти' не найдена. Скроллим.")
+            logger.info(f"[GOLD] Уровень {GOLD_LEVEL} виден, но кнопка 'Перейти' не найдена. Скроллим.")
             found_level, _ = get_list_level(screen_cv, region)
             if found_level is not None:
                 if GOLD_LEVEL < found_level:
@@ -800,7 +801,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
 
         _gold_ctx['level_select_scroll_tries'] = _gold_ctx.get('level_select_scroll_tries', 0) + 1
         if _gold_ctx['level_select_scroll_tries'] > 20:
-            print("[GOLD] Не удалось найти целевой уровень. Сброс.")
+            logger.info("[GOLD] Не удалось найти целевой уровень. Сброс.")
             _gold_ctx['expected'] = None
             _gold_ctx['level_select_scroll_tries'] = 0
             return GoldState.UNKNOWN
@@ -819,7 +820,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
 
     # ---- NO FREE RUDNIK ----
     if current_state == GoldState.NO_FREE_RUDNIK:
-        print("[GOLD] На текущем уровне нет свободных рудников. Пробуем открыть выбор уровня.")
+        logger.info("[GOLD] На текущем уровне нет свободных рудников. Пробуем открыть выбор уровня.")
         # Если видна кнопка выбора уровня — кликнем
         select_coords, _ = find_on_screen(get_template(GOLD_SELECT_LEVEL_IMG), screen_cv, region)
         if select_coords is None:
@@ -841,7 +842,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
             find_started = _gold_ctx['find_started_at']
         elapsed_find = time.time() - find_started
         if elapsed_find > GOLD_SEARCH_TIMEOUT:
-            print(f"[GOLD] Поиск длится {int(elapsed_find)} сек — таймаут {GOLD_SEARCH_TIMEOUT} сек. Сброс.")
+            logger.info(f"[GOLD] Поиск длится {int(elapsed_find)} сек — таймаут {GOLD_SEARCH_TIMEOUT} сек. Сброс.")
             _gold_ctx['find_started_at'] = None
             find_and_click(GOLD_CLOSE_IMG, screen_cv, region)
             return GoldState.UNKNOWN
@@ -862,7 +863,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
         _gold_ctx['swipe_count'] = 0
         gold_coords, gold_conf, gold_template = find_event_gold_in_calendar(screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
         if gold_coords:
-            print(f"[GOLD] Нажали на событие золотодобычи ({gold_template}, conf={gold_conf:.3f}). Ждём попап 'Вперёд'.")
+            logger.info(f"[GOLD] Нажали на событие золотодобычи ({gold_template}, conf={gold_conf:.3f}). Ждём попап 'Вперёд'.")
             pyautogui.click(gold_coords[0], gold_coords[1])
             time.sleep(1.0)
             return GoldState.FORWARD_POPUP_VISIBLE
@@ -873,10 +874,10 @@ def process_gold(screen_cv, region, last_gold_state, window):
         _gold_ctx['expected'] = 'rudnik_tab'
         clicked, _ = find_and_click(GOLD_FORWARD_IMG, screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
         if clicked:
-            print("[GOLD] Нажали 'Вперёд'. Ждём открытия табы рудника.")
+            logger.info("[GOLD] Нажали 'Вперёд'. Ждём открытия табы рудника.")
             time.sleep(0.5)
             return GoldState.RUDNIK_TAB
-        print("[GOLD] Кнопка 'Вперёд' не найдена, пробуем закрыть попап.")
+        logger.info("[GOLD] Кнопка 'Вперёд' не найдена, пробуем закрыть попап.")
         find_and_click(GOLD_CLOSE_IMG, screen_cv, region)
         return GoldState.EVENTS_MENU_OPEN
 
@@ -890,7 +891,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
         find_coords, _ = find_on_screen(get_template(GOLD_FIND_IMG), screen_cv, region)
         select_coords, _ = find_on_screen(get_template(GOLD_SELECT_LEVEL_IMG), screen_cv, region)
         if rudnik_opened_coords or find_coords or select_coords:
-            print("[GOLD] Событие золотодобычи уже открыто (rudnik_tab). Пропускаем свайпы.")
+            logger.info("[GOLD] Событие золотодобычи уже открыто (rudnik_tab). Пропускаем свайпы.")
             _gold_ctx['swipe_count'] = 0
             _gold_ctx['expected'] = 'rudnik_tab'
             return GoldState.RUDNIK_TAB
@@ -906,12 +907,12 @@ def process_gold(screen_cv, region, last_gold_state, window):
         if not calendar_opened_coords:
             calendar_coords, _ = find_on_screen(get_template(CALENDAR_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
             if calendar_coords:
-                print("[GOLD] Нажимаем calendar.png чтобы открыть календарь событий.")
+                logger.info("[GOLD] Нажимаем calendar.png чтобы открыть календарь событий.")
                 find_and_click(CALENDAR_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
                 time.sleep(1.0)
                 return GoldState.EVENTS_MENU_OPEN
             # calendar.png не найден — пробуем свайпать
-            print("[GOLD] calendar.png не найден, пробуем свайпать для поиска.")
+            logger.info("[GOLD] calendar.png не найден, пробуем свайпать для поиска.")
 
         # Календарь открыт — свайпаем для поиска события золотодобычи
         swipe_count = _gold_ctx.get('swipe_count', 0)
@@ -923,7 +924,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
             swipe_horizontal(region, 'right')
         _gold_ctx['swipe_count'] = swipe_count + 1
         if _gold_ctx['swipe_count'] > 20:
-            print("[GOLD] Не удалось найти иконку золотодобычи в меню событий. Сброс.")
+            logger.info("[GOLD] Не удалось найти иконку золотодобычи в меню событий. Сброс.")
             _gold_ctx['swipe_count'] = 0
             _gold_ctx['expected'] = None
             return GoldState.UNKNOWN
@@ -934,7 +935,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
         # Проверим, не открыт ли уже календарь (event_gold или rudnik виден)
         gold_coords, _, _ = find_event_gold_in_calendar(screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
         if gold_coords:
-            print("[GOLD] Календарь уже открыт, событие золотодобычи видно.")
+            logger.info("[GOLD] Календарь уже открыт, событие золотодобычи видно.")
             _gold_ctx['expected'] = 'events'
             _gold_ctx['swipe_count'] = 0
             return GoldState.EVENTS_RUDNIK_VISIBLE
@@ -945,7 +946,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
         # Если видна info.png — это попап, кликаем в верхнюю часть экрана для закрытия
         info_coords, _ = find_on_screen(get_template(INFO_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
         if info_coords:
-            print("[GOLD] Видна info.png — попап открыт. Клик в верхнюю часть экрана для закрытия.")
+            logger.info("[GOLD] Видна info.png — попап открыт. Клик в верхнюю часть экрана для закрытия.")
             click_x = region[0] + region[2] // 2
             click_y = region[1] + int(region[3] * 0.15)
             pyautogui.click(click_x, click_y)
@@ -955,7 +956,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
 
         # Если застряли на main_screen > 3 попыток — клик в верхнюю часть экрана
         if _gold_ctx['main_screen_tries'] > 3:
-            print(f"[GOLD] Застряли на main_screen ({_gold_ctx['main_screen_tries']} попыток). Клик в верхнюю часть экрана.")
+            logger.info(f"[GOLD] Застряли на main_screen ({_gold_ctx['main_screen_tries']} попыток). Клик в верхнюю часть экрана.")
             click_x = region[0] + region[2] // 2
             click_y = region[1] + int(region[3] * 0.15)
             pyautogui.click(click_x, click_y)
@@ -966,7 +967,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
         clicked, _ = find_and_click(EVENTS_IMG, screen_cv, region)
         if not clicked:
             # Если events.png не найден — пробуем calendar.png (иконка календаря в меню событий)
-            print("[GOLD] events.png не найден, пробуем calendar.png")
+            logger.info("[GOLD] events.png не найден, пробуем calendar.png")
             find_and_click(CALENDAR_IMG, screen_cv, region)
         _gold_ctx['swipe_count'] = 0
         _gold_ctx['events_clicked_at'] = time.time()
@@ -976,24 +977,24 @@ def process_gold(screen_cv, region, last_gold_state, window):
 
     # ---- UNKNOWN / STUCK RECOVERY ----
     if current_state == GoldState.UNKNOWN:
-        print(f"[GOLD] UNKNOWN recovery start. stuck_count={_gold_ctx.get('stuck_count', 0)}, expected={_gold_ctx.get('expected')}", flush=True)
+        logger.debug(f"[GOLD] UNKNOWN recovery start. stuck_count={_gold_ctx.get('stuck_count', 0)}, expected={_gold_ctx.get('expected')}")
         clicked_at = _gold_ctx.get('moveon_clicked_at')
         if clicked_at and (time.time() - clicked_at) < 2.0:
-            print("[GOLD] Ожидаем завершения перехода после клика 'Перейти'.")
+            logger.debug("[GOLD] Ожидаем завершения перехода после клика 'Перейти'.")
             _gold_ctx['moveon_clicked_at'] = None
             time.sleep(GOLD_ACTION_DELAY)
             return GoldState.UNKNOWN
 
         clicked_events_at = _gold_ctx.get('events_clicked_at')
         if clicked_events_at and (time.time() - clicked_events_at) < 4.0:
-            print("[GOLD] Ожидаем открытия календаря событий.")
+            logger.debug("[GOLD] Ожидаем открытия календаря событий.")
             time.sleep(0.1)
             return GoldState.UNKNOWN
 
         # Если мы недавно открыли события, но оказались в активном событии — свайп по верхней карусели
         if _gold_ctx.get('expected') == 'events' and clicked_events_at \
                 and (time.time() - clicked_events_at) < 5.0:
-            print("[GOLD] Активное событие открылось вместо календаря. Пробуем свайп по верхней карусели.")
+            logger.debug("[GOLD] Активное событие открылось вместо календаря. Пробуем свайп по верхней карусели.")
             swipe_horizontal(region, 'right')
             time.sleep(0.3)
             return GoldState.UNKNOWN
@@ -1001,21 +1002,21 @@ def process_gold(screen_cv, region, last_gold_state, window):
         _gold_ctx['stuck_count'] = _gold_ctx.get('stuck_count', 0) + 1
         action = _gold_ctx.get('stuck_last_action')
         if action != 'back':
-            print("[GOLD] UNKNOWN recovery: try back", flush=True)
+            logger.debug("[GOLD] UNKNOWN recovery: try back")
             find_and_click(BACK_IMG, screen_cv, region)
             _gold_ctx['stuck_last_action'] = 'back'
         elif action != 'close':
-            print("[GOLD] UNKNOWN recovery: try close", flush=True)
+            logger.debug("[GOLD] UNKNOWN recovery: try close")
             find_and_click(GOLD_CLOSE_IMG, screen_cv, region)
             _gold_ctx['stuck_last_action'] = 'close'
         else:
-            print("[GOLD] UNKNOWN recovery: try village", flush=True)
+            logger.debug("[GOLD] UNKNOWN recovery: try village")
             find_and_click(VILLAGE_IMG, screen_cv, region)
             _gold_ctx['stuck_last_action'] = None
             _gold_ctx['stuck_count'] = 0
 
         time.sleep(0.1)
-        print("[GOLD] UNKNOWN recovery end", flush=True)
+        logger.debug("[GOLD] UNKNOWN recovery end")
         return GoldState.UNKNOWN
 
     return current_state
@@ -1049,7 +1050,7 @@ def process_gold_exit(screen_cv, region, last_exit_state, window):
     else:
         center_x = region[0] + region[2] // 2
         center_y = region[1] + region[3] // 2
-        print(f"[GOLD EXIT] Клик по центру экрана ({center_x}, {center_y}) для сброса UI.")
+        logger.debug(f"[GOLD EXIT] Клик по центру экрана центp экрана ({center_x}, {center_y}) для сброса UI.")
         pyautogui.click(center_x, center_y)
         time.sleep(0.5)
         return current_state
@@ -1075,13 +1076,13 @@ def handle_gold_mode(screen_cv, region, window, last_gold_state, gold_start_time
     """
     # Защитный таймаут
     if gold_start_time and (time.time() - gold_start_time) >= GOLD_TIMEOUT:
-        print(f"[ТАЙМЕР] Золото затянулось > {GOLD_TIMEOUT} сек. Возвращаемся к лечению.")
+        logger.info(f"[ТАЙМЕР] Золото затянулось > {GOLD_TIMEOUT} сек. Возвращаемся к лечению.")
         return MainMode.HEAL, None, None, False
 
     # Если ещё стартуем и не определён state
     if last_gold_state is None:
         current_gold_state = determine_gold_state(screen_cv, region)
-        print(f"[MAIN] GOLD: стартовое состояние {current_gold_state.value}")
+        logger.info(f"[MAIN] GOLD: стартовое состояние {current_gold_state.value}")
         last_gold_state = current_gold_state
 
     # Обработать одно состояние
@@ -1089,14 +1090,14 @@ def handle_gold_mode(screen_cv, region, window, last_gold_state, gold_start_time
         current_gold_state = determine_gold_state(screen_cv, region)
         if current_gold_state != last_gold_state:
             if current_gold_state.value:
-                print(f"[MAIN] GOLD: {current_gold_state.value}")
+                logger.info(f"[MAIN] GOLD: {current_gold_state.value}")
             else:
-                print(f"[MAIN] GOLD: {current_gold_state}")
+                logger.info(f"[MAIN] GOLD: {current_gold_state}")
         last_gold_state = process_gold(screen_cv, region, last_gold_state, window)
 
     # Если добыча завершена — выходим
     if last_gold_state == GoldState.COMPLETED:
-        print("[MAIN] Золотодобыча завершена, возврат к лечению")
+        logger.info("[MAIN] Золотодобыча завершена, возврат к лечению")
         return MainMode.HEAL, None, None, False
 
     # Если не выходим, остаемся в режиме GOLD

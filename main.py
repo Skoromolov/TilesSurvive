@@ -19,15 +19,16 @@ from utils import *
 from heal import *
 from raid import *
 from gold import *
+from logger import logger  # Импортируем логгер
 
 
 # ==========================================
 # ОСНОВНОЙ ЦИКЛ
 # ==========================================
 def main():
-    print("=" * 60)
-    print("[СИСТЕМА] Запуск Heal and Raid Bot")
-    print("=" * 60)
+    logger.info("=" * 60)
+    logger.info("[СИСТЕМА] Запуск Heal and Raid Bot")
+    logger.info("=" * 60)
 
     # Создать папку для отладочных скриншотов
     os.makedirs(DEBUG_SCREENSHOTS_DIR, exist_ok=True)
@@ -35,10 +36,10 @@ def main():
     # Получить окно
     window, region = get_window_region()
     if region is None:
-        print("[СИСТЕМА] Не удалось определить окно BlueStacks. Запуск остановлен.")
+        logger.error("[СИСТЕМА] Не удалось определить окно BlueStacks. Запуск остановлен.")
         return
 
-    print(f"[СИСТЕМА] Окно BlueStacks: region={region}")
+    logger.info(f"[СИСТЕМА] Окно BlueStacks: region={region}")
 
     # Инициализация переменных состояния
     last_heal_state = None
@@ -74,11 +75,11 @@ def main():
 
             # Глобальная проверка reconnect (завершает программу)
             if handle_reconnect(screen_cv, region):
-                print("[СИСТЕМА] Обработано переподключение. Завершение.")
+                logger.info("[СИСТЕМА] Обработано переподключение. Завершение.")
                 return
 
             if handle_reconnect_repeat(screen_cv, region):
-                print("[СИСТЕМА] Обработано повторное переподключение. Завершение.")
+                logger.info("[СИСТЕМА] Обработано повторное переподключение. Завершение.")
                 return
 
             # Режим быстрого лечения с карты мира (высший приоритет, игнорирует всё остальное)
@@ -89,7 +90,7 @@ def main():
             # Принудительный режим RAID
             if FORCE_RAID_ONLY and not FORCE_HEAL_ONLY:
                 current_raid_state = determine_raid_state(screen_cv, region)
-                print(f"[MAIN] Принудительный режим RAID: {current_raid_state.value}")
+                logger.info(f"[MAIN] Принудительный режим RAID: {current_raid_state.value}")
                 last_raid_state, last_join_time, raid_joined_at_least_once = process_raid(
                     screen_cv, region, last_raid_state, None, raid_joined_at_least_once, window
                 )
@@ -105,7 +106,7 @@ def main():
                     # last_heal_state = process_heal(screen_cv, region, last_heal_state, window)
                     # # Золото: только если включено и пора — после лечения
                     # if GOLD_ENABLED and (should_do_gold() or gold_mission_should_recall()):
-                    #     print("[MAIN] Переключение в режим GOLD (FORCE_HEAL_ONLY)")
+                    #     logger.info("[MAIN] Переключение в режим GOLD (FORCE_HEAL_ONLY)")
                     #     current_mode = MainMode.GOLD
                     #     last_gold_state = None
                     #     reset_gold_context()
@@ -116,7 +117,7 @@ def main():
 
                 # Потом проверяем рейды
                 if check_for_raid_button(screen_cv, region):
-                    print("[MAIN] Переключение в режим RAID")
+                    logger.info("[MAIN] Переключение в режим RAID")
                     current_mode = MainMode.RAID
                     last_gold_state = None
                     raid_start_time = time.time()
@@ -128,7 +129,7 @@ def main():
 
                 # Потом золото — если включено и пора
                 if GOLD_ENABLED and (should_do_gold() or gold_mission_should_recall()):
-                    print("[MAIN] Переключение в режим GOLD")
+                    logger.info("[MAIN] Переключение в режим GOLD")
                     current_mode = MainMode.GOLD
                     last_gold_state = None
                     reset_gold_context()
@@ -152,9 +153,9 @@ def main():
                 # Защитный таймаут: если режим RAID затянулся на RAID_JOIN_TIMEOUT — возвращаемся к лечению
                 now = time.time()
                 elapsed = now - raid_start_time if raid_start_time else None
-                print(f"[DEBUG RAID] raid_start_time={raid_start_time}, elapsed={elapsed}, timeout={RAID_JOIN_TIMEOUT}")
+                logger.debug(f"[DEBUG RAID] raid_start_time={raid_start_time}, elapsed={elapsed}, timeout={RAID_JOIN_TIMEOUT}")
                 if raid_start_time and (now - raid_start_time) >= RAID_JOIN_TIMEOUT:
-                    print(f"[ТАЙМЕР] Рейд затянулся > {RAID_JOIN_TIMEOUT} сек. Возвращаемся к лечению.")
+                    logger.info(f"[ТАЙМЕР] Рейд затянулся > {RAID_JOIN_TIMEOUT} сек. Возвращаемся к лечению.")
                     current_mode = MainMode.HEAL
                     last_raid_state = None
                     raid_start_time = None
@@ -165,13 +166,13 @@ def main():
                 # Если ещё стартуем и не определён state
                 if last_raid_state is None:
                     current_raid_state = determine_raid_state(screen_cv, region)
-                    print(f"[MAIN] RAID: стартовое состояние {current_raid_state.value}")
+                    logger.info(f"[MAIN] RAID: стартовое состояние {current_raid_state.value}")
                     last_raid_state = current_raid_state
 
                 # Обработать одно состояние
                 current_raid_state = determine_raid_state(screen_cv, region)
                 if current_raid_state != last_raid_state:
-                    print(f"[MAIN] RAID: {current_raid_state.value}")
+                    logger.info(f"[MAIN] RAID: {current_raid_state.value}")
 
                 last_raid_state, last_join_time, raid_joined_at_least_once = process_raid(
                     screen_cv, region, last_raid_state, last_join_time, raid_joined_at_least_once, window
@@ -183,7 +184,7 @@ def main():
                 #     if raid_terminal_since is None:
                 #         raid_terminal_since = time.time()
                 #     elif time.time() - raid_terminal_since > 30:
-                #         print("[MAIN] RAID застрял в терминальном состоянии > 30 сек. Клик по центру и возврат к HEAL.")
+                #         logger.info("[MAIN] RAID застрял в терминальном состоянии > 30 сек. Клик по центру и возврат к HEAL.")
                 #         center_x = region[0] + region[2] // 2
                 #         center_y = region[1] + region[3] // 2
                 #         pyautogui.click(center_x, center_y)
@@ -199,7 +200,7 @@ def main():
 
                 # Если все рейды завершены — возвращаемся к лечению
                 if last_raid_state == RaidState.RAID_COMPLETED:
-                    print("[MAIN] Рейды завершены, возврат к лечению")
+                    logger.info("[MAIN] Рейды завершены, возврат к лечению")
                     current_mode = MainMode.HEAL
                     last_raid_state = None
                     raid_start_time = None
@@ -208,7 +209,7 @@ def main():
 
                 # Если рейдов больше нет — тоже возвращаемся
                 if last_raid_state == RaidState.NO_REIDS:
-                    print("[MAIN] Рейды отсутствуют, возврат к лечению")
+                    logger.info("[MAIN] Рейды отсутствуют, возврат к лечению")
                     current_mode = MainMode.HEAL
                     last_raid_state = None
                     raid_start_time = None
@@ -221,7 +222,7 @@ def main():
                 time.sleep(1)
 
         except Exception as e:
-            print(f"[ОШИБКА] {e}")
+            logger.error(f"[ОШИБКА] {e}", exc_info=True)
             time.sleep(10)
 
 

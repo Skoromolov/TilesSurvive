@@ -10,9 +10,12 @@ import time
 
 from config import *
 from utils import *
+from logger import logger  # Импортируем логгер
 
 
+# ==========================================
 # Контекст рейда для защиты от зацикливания
+# ==========================================
 _raid_ctx = {
     'march_attempts': 0,
     'last_raid_state': None,
@@ -67,7 +70,7 @@ def check_and_scroll_for_attack(screen_cv, region, log_details=True):
     attack_count = count_attack_mentions(screen_cv)
 
     if log_details:
-        print(f"[RAID] Найдено упоминаний 'Атака': {attack_count}")
+        logger.debug(f"[RAID] Найдено упоминаний 'Атака': {attack_count}")
 
     needs_scroll = attack_count > RAID_SCROLL_THRESHOLD
 
@@ -77,7 +80,7 @@ def check_and_scroll_for_attack(screen_cv, region, log_details=True):
         swipe_distance = int(region[3] * 0.6)
         start_y = center_y + int(region[3] * 0.25)
 
-        print(f"[RAID] СКРОЛЛ! Пролистываем вниз")
+        logger.debug("[RAID] СКРОЛЛ! Пролистываем вниз")
 
         pyautogui.moveTo(center_x, start_y, duration=0.1)
         time.sleep(0.1)
@@ -88,10 +91,10 @@ def check_and_scroll_for_attack(screen_cv, region, log_details=True):
         if region_new:
             screen_cv = take_screenshot(window, region_new)
             attack_after_scroll = count_attack_mentions(screen_cv)
-            print(f"[RAID] После скролла 'Атака': {attack_after_scroll}")
+            logger.debug(f"[RAID] После скролла 'Атака': {attack_after_scroll}")
 
             if attack_after_scroll > RAID_SCROLL_THRESHOLD:
-                print(f"[RAID] Всё ещё много атак: {attack_after_scroll}, скроллим ещё...")
+                logger.debug(f"[RAID] Всё ещё много атак: {attack_after_scroll}, скроллим ещё...")
                 pyautogui.moveTo(center_x, start_y, duration=0.1)
                 time.sleep(0.1)
                 pyautogui.drag(0, -int(swipe_distance * 0.7), duration=0.3, button='left')
@@ -101,7 +104,7 @@ def check_and_scroll_for_attack(screen_cv, region, log_details=True):
                 if region_new:
                     screen_cv = take_screenshot(window, region_new)
                     attack_after_second_scroll = count_attack_mentions(screen_cv)
-                    print(f"[RAID] После второго скролла 'Атака': {attack_after_second_scroll}")
+                    logger.debug(f"[RAID] После второго скролла 'Атака': {attack_after_second_scroll}")
                     return False, attack_after_second_scroll
             else:
                 return False, attack_after_scroll
@@ -119,11 +122,11 @@ def navigate_to_reid_window():
     Навигация к окну рейдов через Союз -> Новости -> Рейды.
     Возвращает: True если успешно
     """
-    print("[RAID] Навигация к окну рейдов...")
+    logger.info("[RAID] Навигация к окну рейдов...")
 
     window, region = get_window_region()
     if region is None:
-        print("[RAID] ОШИБКА: Не удалось получить область окна")
+        logger.error("[RAID] ОШИБКА: Не удалось получить область окна")
         return False
 
     screen_cv = take_screenshot(window, region)
@@ -131,7 +134,7 @@ def navigate_to_reid_window():
     # Если находимся в попапе лечения — сначала закрываем его через back/close
     heal_btn_coords, _ = find_on_screen(get_template(HEAL_BUTTON_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if heal_btn_coords:
-        print("[RAID] Обнаружен попап лечения — закрываем перед навигацией.")
+        logger.debug("[RAID] Обнаружен попап лечения — закрываем перед навигацией.")
         find_and_click(BACK_IMG, screen_cv, region)
         time.sleep(0.3)
         screen_cv = take_screenshot(window, region)
@@ -140,7 +143,7 @@ def navigate_to_reid_window():
     reid_active, _ = find_on_screen(get_template(RAID_ACTIVE_IMG), screen_cv, region, threshold=NAVIGATION_THRESHOLD)
     reid_not_active, _ = find_on_screen(get_template(RAID_NOT_ACTIVE_IMG), screen_cv, region, threshold=NAVIGATION_THRESHOLD)
     if reid_active or reid_not_active:
-        print("[RAID] Уже в окне рейдов.")
+        logger.info("[RAID] Уже в окне рейдов.")
         return True
 
     if find_and_click(SOUZ_IMG, screen_cv, region, threshold=NAVIGATION_THRESHOLD):
@@ -150,30 +153,30 @@ def navigate_to_reid_window():
         if find_and_click(SOUZ_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD):
             time.sleep(0.3)
         else:
-            print("[RAID] ✗ Кнопка 'Союз' НЕ найдена")
+            logger.error("[RAID] ✗ Кнопка 'Союз' НЕ найдена")
             return False
 
     screen_cv = take_screenshot(window, region)
 
     if find_and_click(NEWS_IMG, screen_cv, region, threshold=NAVIGATION_THRESHOLD):
-        print("[RAID] ✓ Нажата кнопка 'Новости'")
+        logger.info("[RAID] ✓ Нажата кнопка 'Новости'")
         time.sleep(0.3)
     else:
         if find_and_click(NEWS_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD):
-            print("[RAID] ✓ Нажата кнопка 'Новости' (fallback)")
+            logger.info("[RAID] ✓ Нажата кнопка 'Новости' (fallback)")
             time.sleep(0.3)
         else:
-            print("[RAID] ✗ Кнопка 'Новости' НЕ найдена")
+            logger.error("[RAID] ✗ Кнопка 'Новости' НЕ найдена")
             return False
 
     screen_cv = take_screenshot(window, region)
 
     if find_and_click(RAID_NOT_ACTIVE_IMG, screen_cv, region, threshold=NAVIGATION_THRESHOLD):
         time.sleep(0.3)
-        print("[RAID] Переход в рейды завершен")
+        logger.info("[RAID] Переход в рейды завершен")
         return True
     else:
-        print("[RAID] ✗ Переход в рейды НЕ удался")
+        logger.error("[RAID] ✗ Переход в рейды НЕ удался")
         return False
 
 
@@ -251,7 +254,7 @@ def process_raid(screen_cv, region, last_raid_state, last_join_time, raid_joined
         _raid_ctx['last_raid_state'] = current_state
 
     if current_state != last_raid_state:
-        print(f"[RAID] Состояние: {current_state.value}")
+        logger.info(f"[RAID] Состояние: {current_state.value}")
 
     if current_state == RaidState.RECONNECT_POPUP:
         handle_reconnect(screen_cv, region)
@@ -264,7 +267,7 @@ def process_raid(screen_cv, region, last_raid_state, last_join_time, raid_joined
     if current_state == RaidState.NAVIGATION_NEEDED:
         success = navigate_to_reid_window()
         if not success:
-            print("[RAID] Навигация к рейдам не удалась. Завершаем режим RAID.")
+            logger.error("[RAID] Навигация к рейдам не удалась. Завершаем режим RAID.")
             return RaidState.RAID_COMPLETED, last_join_time, raid_joined_at_least_once
         return None, last_join_time, raid_joined_at_least_once
 
@@ -272,7 +275,7 @@ def process_raid(screen_cv, region, last_raid_state, last_join_time, raid_joined
         found, _ = find_and_click(RAID_NOT_ACTIVE_IMG, screen_cv, region)
         if found:
             return RaidState.RAID_WINDOW_ACTIVE, last_join_time, raid_joined_at_least_once
-        print("[RAID] Вкладка рейдов не активна и не нажалась. Завершаем режим RAID.")
+        logger.error("[RAID] Вкладка рейдов не активна и не нажалась. Завершаем режим RAID.")
         return RaidState.RAID_COMPLETED, last_join_time, raid_joined_at_least_once
 
     if current_state == RaidState.NO_FREE_SPACE:
@@ -313,9 +316,6 @@ def process_raid(screen_cv, region, last_raid_state, last_join_time, raid_joined
                 screen_cv = take_screenshot(window, region)
                 ok_found, _ =  find_and_click(RAID_OK_IMG, screen_cv, region)
                 if no_space_found:
-                    # time.sleep(0.3)
-                    # screen_cv = take_screenshot(window, region)
-                    # find_and_click(RAID_OK_IMG, screen_cv, region)
                     return RaidState.NO_FREE_SPACE, time.time(), True
                 if ok_found:
                     return RaidState.RAID_IN_PROGRESS, time.time(), True
@@ -328,35 +328,14 @@ def process_raid(screen_cv, region, last_raid_state, last_join_time, raid_joined
         # Защита от зацикливания: максимум 3 попытки клика по Марш
         _raid_ctx['march_attempts'] = _raid_ctx.get('march_attempts', 0) + 1
         if _raid_ctx['march_attempts'] > 3:
-            print(f"[RAID] Марш не сработал после {_raid_ctx['march_attempts']-1} попыток. Закрываем попап и продолжаем поиск рейдов.")
+            logger.warning(f"[RAID] Марш не сработал после {_raid_ctx['march_attempts']-1} попыток. Закрываем попап и продолжаем поиск рейдов.")
             find_and_click(CLOSE_IMG, screen_cv, region)
             find_and_click(BACK_IMG, screen_cv, region)
             _raid_ctx['march_attempts'] = 0
             return RaidState.NEEDS_SCROLL, time.time(), raid_joined_at_least_once
 
-        # found2, _ = find_and_click(RAID_MARCH_IMG, screen_cv, region)
-        # if found2:
-        #     time.sleep(0.3)
-        #     screen_cv = take_screenshot(window, region)
-            
-            # Check for OK button immediately after marching (e.g., "raid full" confirmation)
-            # ok_found, _ = find_and_click(RAID_OK_IMG, screen_cv, region)
-            # if ok_found:
-            #     time.sleep(0.3)
-            #     screen_cv = take_screenshot(window, region)
-            #     return RaidState.NO_FREE_SPACE, time.time(), True
-            
-            # Original logic: check for "no free space" popup
-            # no_space_found, _ = find_and_click(RAID_NO_FREE_SPACE_IMG, screen_cv, region)
-            # if no_space_found:
-            #     time.sleep(0.3)
-            #     screen_cv = take_screenshot(window, region)
-            #     find_and_click(RAID_OK_IMG, screen_cv, region)
-            #     return RaidState.NO_FREE_SPACE, time.time(), True
-            # return RaidState.RAID_IN_PROGRESS, time.time(), True
-
         # Кнопка Марш видна, но клик не сработал — пробуем закрыть/вернуться
-        print("[RAID] Кнопка Марш видна, но клик не удался. Закрываем попап.")
+        logger.warning("[RAID] Кнопка Марш видна, но клик не удался. Закрываем попап.")
         find_and_click(CLOSE_IMG, screen_cv, region)
         _raid_ctx['march_attempts'] = 0
         return RaidState.NEEDS_SCROLL, time.time(), raid_joined_at_least_once
@@ -387,14 +366,14 @@ def check_for_raid_button(screen_cv, region):
     # Проверка первой кнопки
     found, conf = find_on_screen(get_template(RAID_HAVE_TO_CONNECT_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if found:
-        print(f"[RAID] Найден рейд (RAID_HAVE_TO_CONNECT_IMG, conf={conf:.3f})")
+        logger.debug(f"[RAID] Найден рейд (RAID_HAVE_TO_CONNECT_IMG, conf={conf:.3f})")
         find_and_click(RAID_HAVE_TO_CONNECT_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)
         return True
 
     # Проверка второй кнопки
     found, conf = find_on_screen(get_template(RAID_HAVE_TO_CONNECT_2_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if found:
-        print(f"[RAID] Найден рейд (RAID_HAVE_TO_CONNECT_2_IMG, conf={conf:.3f})")
+        logger.debug(f"[RAID] Найден рейд (RAID_HAVE_TO_CONNECT_2_IMG, conf={conf:.3f})")
         find_and_click(RAID_HAVE_TO_CONNECT_2_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)
         return True
 
