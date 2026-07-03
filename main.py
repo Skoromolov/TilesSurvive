@@ -19,7 +19,7 @@ from utils import *
 from heal import *
 from raid import *
 from gold import *
-from adventure import process_adventure_state
+from adventure import process_adventure_state, determine_adventure_state
 from logger import logger  # Импортируем логгер
 
 
@@ -46,6 +46,7 @@ def main():
     last_heal_state = None
     last_raid_state = None
     last_gold_state = None
+    last_adventure_state = None
     current_mode = MainMode.HEAL
 
     raid_joined_at_least_once = False
@@ -99,10 +100,15 @@ def main():
 
             # Принудительный режим ADVENTURE
             if FORCE_ADVENTURE_ONLY and not FORCE_HEAL_ONLY:
-                current_adventure_state = determine_heal_state(screen_cv, region)
+                current_adventure_state = determine_adventure_state(screen_cv, region)
                 logger.info(f"[MAIN] Принудительный режим ADVENTURE: {current_adventure_state.value}")
-                # Process adventure state - need to pass last_heal_state and window
-                last_heal_state = process_adventure_state(screen_cv, region, last_heal_state, window, current_adventure_state)
+                # Process adventure state - need to pass last_adventure_state and window
+                new_adventure_state = process_adventure_state(screen_cv, region, last_adventure_state, window, current_adventure_state)
+                last_adventure_state = new_adventure_state
+                # If adventure finished (returned UNKNOWN), switch back to heal
+                if new_adventure_state == AdventureState.UNKNOWN:
+                    current_mode = MainMode.HEAL
+                    last_adventure_state = None
                 continue
 
             # Режим HEAL
@@ -110,17 +116,6 @@ def main():
                 last_heal_state = process_heal(screen_cv, region, last_heal_state, window)
 
                 if FORCE_HEAL_ONLY:
-                    # check_and_click_help_button(screen_cv, region)
-                    # last_heal_state = process_heal(screen_cv, region, last_heal_state, window)
-                    # # Золото: только если включено и пора — после лечения
-                    # if GOLD_ENABLED and (should_do_gold() or gold_mission_should_recall()):
-                    #     logger.info("[MAIN] Переключение в режим GOLD (FORCE_HEAL_ONLY)")
-                    #     current_mode = MainMode.GOLD
-                    #     last_gold_state = None
-                    #     reset_gold_context()
-                    #     time.sleep(0.2)
-                    #     gold_start_time = time.time()
-                    #     continue
                     continue
 
                 # Потом проверяем рейды
@@ -134,6 +129,15 @@ def main():
                     raid_nav_grace_until = time.time() + 10
                     last_raid_state = None
                     continue
+
+                # Автоматическое переключение в режим приключений (если включено и видим кнопку adventure)
+                if ADVENTURE_ENABLED:
+                    adventure_state = determine_adventure_state(screen_cv, region)
+                    if adventure_state == AdventureState.ADVENTURE:
+                        logger.info("[MAIN] Переключение в режим ADVENTURE (авто)")
+                        current_mode = MainMode.ADVENTURE
+                        last_adventure_state = None
+                        continue
 
                 # Потом золото — если включено и пора
                 if GOLD_ENABLED and (should_do_gold() or gold_mission_should_recall()):
@@ -151,7 +155,7 @@ def main():
                 # Обрабатываем режим GOLD через вынесенную функцию
                 result = handle_gold_mode(screen_cv, region, window, last_gold_state, gold_start_time, gold_exit_state, gold_exiting)
                 next_mode, last_gold_state, gold_start_time, gold_exit_state, gold_exiting = result
-                
+
                 if next_mode == MainMode.HEAL:
                     current_mode = MainMode.HEAL
                     continue
@@ -223,6 +227,20 @@ def main():
                     raid_start_time = None
                     raid_joined_at_least_once = False
                     continue
+
+            # Режим ADVENTURE
+            elif current_mode == MainMode.ADVENTURE:
+                # Обрабатываем состояние приключения
+                current_adventure_state = determine_adventure_state(screen_cv, region)
+                logger.info(f"[MAIN] ADVENTURE: {current_adventure_state.value}")
+                new_adventure_state = process_adventure_state(screen_cv, region, last_adventure_state, window, current_adventure_state)
+                last_adventure_state = new_adventure_state
+                # Если приключение завершено (возвращено UNKNOWN), возвращаемся к лечению
+                if new_adventure_state == AdventureState.UNKNOWN:
+                    logger.info("[MAIN] Приключение завершено, возврат к лечению")
+                    current_mode = MainMode.HEAL
+                    last_adventure_state = None
+                continue
 
             if current_mode == MainMode.GOLD:
                 time.sleep(GOLD_LOOP_DELAY)

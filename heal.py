@@ -65,13 +65,7 @@ def determine_heal_state(screen_cv, region):
     if coords:
         return HealState.BOOK
 
-    coords, _ = find_on_screen(get_template(ADVENTURE_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
-    if coords:
-        return HealState.ADVENTURE
-
-    coords, _ = find_on_screen(get_template(ADVENTURE_GET_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
-    if coords:
-        return HealState.ADVENTURE_GET
+    # Removed adventure detection
 
     coords, _ = find_on_screen(get_template(WILD_EARTH_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if coords:
@@ -96,9 +90,7 @@ def process_heal(screen_cv, region, last_heal_state, window=None):
     current_state = determine_heal_state(screen_cv, region)
     logger.debug(f"[HEAL] определили Состояние: {current_state.value}")
 
-    # Обработка состояний приключения через отдельный модуль
-    if current_state in (HealState.ADVENTURE, HealState.ADVENTURE_GET, HealState.ADVENTURE_CONFIRM):
-        return process_adventure_state(screen_cv, region, last_heal_state, window, current_state)
+    # Removed adventure state processing
 
     # Обработка каждого состояния
     if current_state == HealState.RECONNECT_POPUP:
