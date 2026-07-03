@@ -99,7 +99,7 @@ def main():
 
             # Принудительный режим ADVENTURE
             if FORCE_ADVENTURE_ONLY and not FORCE_HEAL_ONLY:
-                current_adventure_state = determine_adventure_state(screen_cv, region)
+                current_adventure_state = determine_heal_state(screen_cv, region)
                 logger.info(f"[MAIN] Принудительный режим ADVENTURE: {current_adventure_state.value}")
                 # Process adventure state - need to pass last_heal_state and window
                 last_heal_state = process_adventure_state(screen_cv, region, last_heal_state, window, current_adventure_state)
