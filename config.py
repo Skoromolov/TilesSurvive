@@ -19,7 +19,8 @@ FOLDER_GOLD = 'gold/'
 # НАСТРОЙКИ РЕЖИМА РАБОТЫ
 # ==========================================
 FORCE_HEAL_ONLY = False   # True = только лечение, False = автопереключение
-FORCE_RAID_ONLY = True   # True = только рейды, False = автопереключение
+FORCE_RAID_ONLY = False   # True = только рейды, False = автопереключение
+FORCE_ADVENTURE_ONLY = False   # True = только приключения, False = автопереключение
 
 # ==========================================
 # НАСТРОЙКИ БЫСТРОГО ЛЕЧЕНИЯ С КАРТЫ МИРА
@@ -161,6 +162,7 @@ class MainMode(Enum):
     HEAL = "heal"
     RAID = "raid"
     GOLD = "gold"  # Режим золотодобычи
+    ADVENTURE = "adventure"  # Режим приключений
 
 
 class HealState(Enum):

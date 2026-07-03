@@ -19,6 +19,7 @@ from utils import *
 from heal import *
 from raid import *
 from gold import *
+from adventure import process_adventure_state
 from logger import logger  # Импортируем логгер
 
 
@@ -96,9 +97,16 @@ def main():
                 )
                 continue
 
+            # Принудительный режим ADVENTURE
+            if FORCE_ADVENTURE_ONLY and not FORCE_HEAL_ONLY:
+                current_adventure_state = determine_adventure_state(screen_cv, region)
+                logger.info(f"[MAIN] Принудительный режим ADVENTURE: {current_adventure_state.value}")
+                # Process adventure state - need to pass last_heal_state and window
+                last_heal_state = process_adventure_state(screen_cv, region, last_heal_state, window, current_adventure_state)
+                continue
+
             # Режим HEAL
             if (current_mode == MainMode.HEAL) or FORCE_HEAL_ONLY:
-                check_and_click_help_button(screen_cv, region)
                 last_heal_state = process_heal(screen_cv, region, last_heal_state, window)
 
                 if FORCE_HEAL_ONLY:
