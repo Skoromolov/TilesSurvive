@@ -21,6 +21,7 @@ from config import (
     RECONNECT_IMG,
     RECONNECT_REPEAT_IMG,
 )
+from logger import logger
 
 
 # ==========================================
@@ -37,7 +38,7 @@ def get_window_region():
             window.activate()
         return window, (window.left, window.top, window.width, window.height)
     except IndexError:
-        print(f"Окно '{BLUESTACKS_WINDOW_TITLE}' не найдено.")
+        logger.info(f"Окно '{BLUESTACKS_WINDOW_TITLE}' не найдено.")
         return None, None
 
 
@@ -104,7 +105,7 @@ def take_screenshot(window, region):
         return screen_cv
 
     except Exception as e:
-        print(f"[СКРИНШОТ] win32 не сработал: {e}")
+        logger.info(f"[СКРИНШОТ] win32 не сработал: {e}")
         screenshot = pyautogui.screenshot(region=region)
         screen_cv = np.array(screenshot)
         if screen_cv.dtype != np.uint8:
@@ -141,22 +142,22 @@ def find_and_click(template_path, screen_cv, region, threshold=CONFIDENCE_THRESH
     """
     template = get_template(template_path)
     if template is None:
-        print(f"[find_and_click] шаблон не найден: {template_path}")
+        logger.info(f"[find_and_click] шаблон не найден: {template_path}")
         return False, None
 
     coords, conf = find_on_screen(template, screen_cv, region, threshold)
 
     if coords:
         if conf >= threshold:
-            print(f"[find_and_click] ✓ найден: {template_path} (conf={conf:.3f}, coords={coords})")
+            logger.info(f"[find_and_click] ✓ найден: {template_path} (conf={conf:.3f}, coords={coords})")
             pyautogui.click(coords[0], coords[1])
             # print(f"[find_and_click] ✓ клик выполнен по: {template_path}")
             return True, coords
         else:
-            print(f"[find_and_click] ✗ найден ниже порога: {template_path} (conf={conf:.3f}, порог={threshold})")
+            logger.info(f"[find_and_click] ✗ найден ниже порога: {template_path} (conf={conf:.3f}, порог={threshold})")
             return False, None
     else:
-        print(f"[find_and_click] ✗ не найден: {template_path} (max_conf={conf:.3f}, порог={threshold})")
+        logger.info(f"[find_and_click] ✗ не найден: {template_path} (max_conf={conf:.3f}, порог={threshold})")
         return False, None
 
 
@@ -199,7 +200,7 @@ def swipe_horizontal(region, direction="right", duration=0.5, y_offset=80):
         x1, x2 = x2, x1
     pyautogui.moveTo(x1, y, duration=0.2)
     pyautogui.dragTo(x2, y, duration=duration, button="left")
-    print(f"[SWIPE] {direction}: ({x1},{y}) -> ({x2},{y})")
+    logger.info(f"[SWIPE] {direction}: ({x1},{y}) -> ({x2},{y})")
 
 
 def scroll_in_region(region, direction="down", duration=0.3, step_ratio=0.3):
@@ -218,7 +219,7 @@ def scroll_in_region(region, direction="down", duration=0.3, step_ratio=0.3):
         y1, y2 = y2, y1
     pyautogui.moveTo(cx, y1, duration=0.2)
     pyautogui.dragTo(cx, y2, duration=duration, button="left")
-    print(f"[SCROLL] {direction}: ({cx},{y1}) -> ({cx},{y2})")
+    logger.info(f"[SCROLL] {direction}: ({cx},{y1}) -> ({cx},{y2})")
 
 
 # ==========================================
@@ -231,7 +232,7 @@ def handle_reconnect(screen_cv, region):
     """
     found, _ = find_and_click(RECONNECT_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if found:
-        print("[RECONNECT] Нажата кнопка переподключения")
+        logger.info("[RECONNECT] Нажата кнопка переподключения")
         time.sleep(3)
         return True
     return False
@@ -244,7 +245,7 @@ def handle_reconnect_repeat(screen_cv, region):
     """
     found, _ = find_and_click(RECONNECT_REPEAT_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if found:
-        print("[RECONNECT_REPEAT] Нажата кнопка переподключения")
+        logger.info("[RECONNECT_REPEAT] Нажата кнопка переподключения")
         time.sleep(3)
         return True
     return False
@@ -260,4 +261,4 @@ def save_debug_screenshot(screen_cv, step_name):
     filename = f"{timestamp}_{step_name}.png"
     filepath = os.path.join(DEBUG_SCREENSHOTS_DIR, filename)
     cv2.imwrite(filepath, screen_cv)
-    print(f"[DEBUG] Скриншот сохранён: {filepath}")
+    logger.info(f"[DEBUG] Скриншот сохранён: {filepath}")
