@@ -256,13 +256,13 @@ def process_raid(screen_cv, region, last_raid_state, last_join_time, raid_joined
     if current_state != last_raid_state:
         logger.info(f"[RAID] Состояние: {current_state.value}")
 
-    if current_state == RaidState.RECONNECT_POPUP:
-        handle_reconnect(screen_cv, region)
-        return None, last_join_time, raid_joined_at_least_once
-
-    if current_state == RaidState.RECONNECT_REPEAT_POPUP:
-        handle_reconnect_repeat(screen_cv, region)
-        return None, last_join_time, raid_joined_at_least_once
+    # if current_state == RaidState.RECONNECT_POPUP:
+    #     handle_reconnect(screen_cv, region)
+    #     return None, last_join_time, raid_joined_at_least_once
+    #
+    # if current_state == RaidState.RECONNECT_REPEAT_POPUP:
+    #     handle_reconnect_repeat(screen_cv, region)
+    #     return None, last_join_time, raid_joined_at_least_once
 
     if current_state == RaidState.NAVIGATION_NEEDED:
         success = navigate_to_reid_window()
@@ -279,11 +279,20 @@ def process_raid(screen_cv, region, last_raid_state, last_join_time, raid_joined
         return RaidState.RAID_COMPLETED, last_join_time, raid_joined_at_least_once
 
     if current_state == RaidState.NO_FREE_SPACE:
-        clicked, _ = find_and_click(RAID_OK_IMG, screen_cv, region)
-        if not clicked:
-            # find_and_click(BACK_IMG, screen_cv, region)
-            find_and_click(CLOSE_IMG, screen_cv, region)
-        return RaidState.RAID_COMPLETED, time.time(), raid_joined_at_least_once
+        logger.info("[RAID] Диалог 'нет свободных мест'. Пытаемся закрыть.")
+        # Понижаем порог, т.к. кнопка закрытия может быть частично перекрыта
+        clicked, coords = find_and_click(RAID_OK_IMG, screen_cv, region, threshold=0.55)
+        if clicked:
+            logger.info(f"[RAID] Нажата OK (coords={coords})")
+            return RaidState.RAID_WINDOW_ACTIVE, time.time(), raid_joined_at_least_once
+        clicked, coords = find_and_click(CLOSE_IMG, screen_cv, region, threshold=0.55)
+        if clicked:
+            logger.info(f"[RAID] Нажат CLOSE (coords={coords})")
+            return RaidState.RAID_WINDOW_ACTIVE, time.time(), raid_joined_at_least_once
+        # Фолбэк: back и остаёмся в режиме
+        logger.warning("[RAID] Не удалось закрыть диалог no_free_space, пробуем BACK")
+        find_and_click(BACK_IMG, screen_cv, region)
+        return RaidState.RAID_WINDOW_ACTIVE, time.time(), raid_joined_at_least_once
 
     if current_state == RaidState.RAID_FULL:
         find_and_click(RAID_OK_IMG, screen_cv, region)
@@ -351,17 +360,6 @@ def check_for_raid_button(screen_cv, region):
     Проверить наличие кнопок присоединения к рейду.
     Возвращает: True если найдена и нажата
     """
-    # Не ищем рейды если открыт попап лечения — heal_button или heal_free_button
-    heal_button = get_template(HEAL_BUTTON_IMG)
-    heal_free_button = get_template(HEAL_FREE_BUTTON_IMG)
-    if heal_button is not None:
-        coords, _ = find_on_screen(heal_button, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
-        if coords:
-            return False
-    if heal_free_button is not None:
-        coords, _ = find_on_screen(heal_free_button, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
-        if coords:
-            return False
 
     # Проверка первой кнопки
     found, conf = find_on_screen(get_template(RAID_HAVE_TO_CONNECT_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)

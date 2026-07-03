@@ -14,13 +14,8 @@ import win32gui
 import win32ui
 import win32con
 
-from config import (
-    BLUESTACKS_WINDOW_TITLE,
-    CONFIDENCE_THRESHOLD,
-    DEBUG_SCREENSHOTS_DIR,
-    RECONNECT_IMG,
-    RECONNECT_REPEAT_IMG,
-)
+from config import *
+
 from logger import logger
 
 
@@ -160,6 +155,27 @@ def find_and_click(template_path, screen_cv, region, threshold=CONFIDENCE_THRESH
         logger.info(f"[find_and_click] ✗ не найден: {template_path} (max_conf={conf:.3f}, порог={threshold})")
         return False, None
 
+def find_and_click_no_logs(template_path, screen_cv, region, threshold=CONFIDENCE_THRESHOLD):
+    """
+    Найти шаблон (с кэшированием) и кликнуть по нему.
+    Возвращает: (found: bool, coords: tuple or None)
+    """
+    template = get_template(template_path)
+    if template is None:
+        logger.info(f"[find_and_click] шаблон не найден: {template_path}")
+        return False, None
+
+    coords, conf = find_on_screen(template, screen_cv, region, threshold)
+
+    if coords:
+        if conf >= threshold:
+            pyautogui.click(coords[0], coords[1])
+            return True, coords
+        else:
+            return False, None
+    else:
+        return False, None
+
 
 def find_all_on_screen(template, screen_cv, region, threshold=CONFIDENCE_THRESHOLD):
     """
@@ -222,6 +238,43 @@ def scroll_in_region(region, direction="down", duration=0.3, step_ratio=0.3):
     logger.info(f"[SCROLL] {direction}: ({cx},{y1}) -> ({cx},{y2})")
 
 
+def _is_at_main_screen_village(screen_cv, region):
+    """Проверить, что мы вышли в окно поселения (виден WILD_EARTH_IMG или VILLAGE_IMG)."""
+    wild_coords, _ = find_on_screen(get_template(WILD_EARTH_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+    if wild_coords:
+        return True
+    return False
+
+
+def ensure_exit_to_main_screen(window, region, max_attempts=10):
+    """
+    Пытаться выйти в окно поселения, пока не увидим WILD_EARTH_IMG/VILLAGE_IMG.
+    Если видна кнопка village — нажимаем на неё, чтобы вернуться в поселение.
+    Возвращает True если выход подтверждён, False если превышено число попыток.
+    """
+    for attempt in range(1, max_attempts + 1):
+        screen_cv = take_screenshot(window, region)
+        if _is_at_main_screen_village(screen_cv, region):
+            logger.info("[EXIT] Подтверждён выход в окно поселения (wild/village видно).")
+            return True
+
+        # Если видна кнопка village — нажимаем на неё, чтобы вернуться в поселение
+        village_coords, village_conf = find_and_click(VILLAGE_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+
+        logger.info(f"[EXIT] Попытка выхода {attempt}/{max_attempts}: нажимаем back.png")
+        find_and_click(BACK_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        time.sleep(0.5)
+        screen_cv = take_screenshot(window, region)
+        if _is_at_main_screen_village(screen_cv, region):
+            return True
+
+        logger.info(f"[EXIT] Попытка выхода {attempt}/{max_attempts}: нажимаем close.png")
+        find_and_click(CLOSE_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        time.sleep(0.5)
+
+    logger.warning("[EXIT] Не удалось подтвердить выход в окно поселения после всех попыток.")
+    return False
+
 # ==========================================
 # ОБРАБОТКА RECONNECT
 # ==========================================
@@ -230,7 +283,7 @@ def handle_reconnect(screen_cv, region):
     Обработать окно переподключения.
     Возвращает: True если найдено и обработано
     """
-    found, _ = find_and_click(RECONNECT_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+    found, _ = find_and_click_no_logs(RECONNECT_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if found:
         logger.info("[RECONNECT] Нажата кнопка переподключения")
         time.sleep(3)
@@ -243,7 +296,7 @@ def handle_reconnect_repeat(screen_cv, region):
     Обработать окно повторного переподключения.
     Возвращает: True если найдено и обработано
     """
-    found, _ = find_and_click(RECONNECT_REPEAT_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+    found, _ = find_and_click_no_logs(RECONNECT_REPEAT_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if found:
         logger.info("[RECONNECT_REPEAT] Нажата кнопка переподключения")
         time.sleep(3)
