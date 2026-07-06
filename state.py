@@ -3,10 +3,8 @@ import json
 import os
 from pathlib import Path
 
-from config import FOLDER
-
-# Папка для данных — та же, где и pictures, logs и т.д.
-STATE_DIR = Path(FOLDER) / "data"
+# Папка для данных — рядом с pictures/, logs/ и т.д., а не внутри pictures/
+STATE_DIR = Path(".") / "data"
 STATE_FILE = STATE_DIR / "bot_state.json"
 
 # Ключи, которые сохраняются между перезапусками
