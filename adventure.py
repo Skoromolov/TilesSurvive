@@ -13,6 +13,7 @@ def reset_adventure_context():
     """Reset the adventure module's internal state."""
     global _adventure_get_attempts
     _adventure_get_attempts = 0
+
 def process_adventure_state(screen_cv, region, last_adventure_state, window, current_state):
     """
     Обработать одно состояние приключения.

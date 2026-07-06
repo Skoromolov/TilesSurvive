@@ -103,6 +103,24 @@ def process_heal(screen_cv, region, last_heal_state, window=None):
 
     if current_state == HealState.MAIN_SCREEN:
         _heal_menu_open_attempts = 0
+        # На главном экране ищем активные элементы для лечения/сбора/помощи
+        # Если ничего не найдено — режим HEAL завершён
+        found_action = False
+        for img, name, threshold in [
+            (HEAL_TOWN_IMG, "heal_town", CONFIDENCE_THRESHOLD),
+            (HEAL_HELP_HANDS_IMG, "heal_help_hands", CONFIDENCE_THRESHOLD),
+            (HELP_HANDS_IMG, "help_hands", CONFIDENCE_THRESHOLD),
+            (BOOK_IMG, "book", CONFIDENCE_THRESHOLD),
+            (MAIL_IMG, "mail", CONFIDENCE_THRESHOLD),
+        ]:
+            found, _ = find_and_click(img, screen_cv, region, threshold=threshold)
+            if found:
+                logger.info(f"[HEAL] На главном экране нажато: {name}")
+                found_action = True
+                break
+        if not found_action:
+            logger.info("[HEAL] На главном экране нет активных элементов для лечения. Завершаем режим.")
+            return HealState.COMPLETED
         return HealState.MAIN_SCREEN
 
     if current_state == HealState.BOOK:

@@ -30,10 +30,16 @@ def get_window_region():
     try:
         window = gw.getWindowsWithTitle(BLUESTACKS_WINDOW_TITLE)[0]
         if not window.isActive:
-            window.activate()
+            try:
+                window.activate()
+            except Exception as e:
+                logger.debug(f"[WINDOW] Не удалось активировать окно: {e}")
         return window, (window.left, window.top, window.width, window.height)
     except IndexError:
         logger.info(f"Окно '{BLUESTACKS_WINDOW_TITLE}' не найдено.")
+        return None, None
+    except Exception as e:
+        logger.error(f"[WINDOW] Ошибка при получении окна: {e}")
         return None, None
 
 
@@ -137,7 +143,7 @@ def find_and_click(template_path, screen_cv, region, threshold=CONFIDENCE_THRESH
     """
     template = get_template(template_path)
     if template is None:
-        logger.info(f"[find_and_click] шаблон не найден: {template_path}")
+        logger.error(f"[find_and_click] шаблон не найден: {template_path}")
         return False, None
 
     coords, conf = find_on_screen(template, screen_cv, region, threshold)
@@ -149,10 +155,10 @@ def find_and_click(template_path, screen_cv, region, threshold=CONFIDENCE_THRESH
             # print(f"[find_and_click] ✓ клик выполнен по: {template_path}")
             return True, coords
         else:
-            logger.info(f"[find_and_click] ✗ найден ниже порога: {template_path} (conf={conf:.3f}, порог={threshold})")
+            logger.debug(f"[find_and_click] ✗ найден ниже порога: {template_path} (conf={conf:.3f}, порог={threshold})")
             return False, None
     else:
-        logger.info(f"[find_and_click] ✗ не найден: {template_path} (max_conf={conf:.3f}, порог={threshold})")
+        logger.debug(f"[find_and_click] ✗ не найден: {template_path} (max_conf={conf:.3f}, порог={threshold})")
         return False, None
 
 def find_and_click_no_logs(template_path, screen_cv, region, threshold=CONFIDENCE_THRESHOLD):
@@ -162,7 +168,6 @@ def find_and_click_no_logs(template_path, screen_cv, region, threshold=CONFIDENC
     """
     template = get_template(template_path)
     if template is None:
-        logger.info(f"[find_and_click] шаблон не найден: {template_path}")
         return False, None
 
     coords, conf = find_on_screen(template, screen_cv, region, threshold)
@@ -239,38 +244,68 @@ def scroll_in_region(region, direction="down", duration=0.3, step_ratio=0.3):
 
 
 def _is_at_main_screen_village(screen_cv, region):
-    """Проверить, что мы вышли в окно поселения (виден WILD_EARTH_IMG или VILLAGE_IMG)."""
+    """
+    Проверить, что мы находимся в окне поселения.
+    В диких землях (wild lands) виден WILD_EARTH_IMG и кнопка VILLAGE_IMG ("в поселение").
+    В поселении видны поселенческие маркеры (souz, heal_town, events, mail, book) и НЕ видна кнопка "в поселение".
+    """
+    # Если видна кнопка "в поселение" — мы на карте мира, не в поселении
+    village_coords, _ = find_on_screen(get_template(VILLAGE_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+    if village_coords:
+        return False
+
+    # Settlement markers
+    settlement_markers = [
+        (SOUZ_IMG, CONFIDENCE_MEDIUM_THRESHOLD),
+        (HEAL_TOWN_IMG, CONFIDENCE_MEDIUM_THRESHOLD),
+        (EVENTS_IMG, CONFIDENCE_MEDIUM_THRESHOLD),
+        (MAIL_IMG, CONFIDENCE_MEDIUM_THRESHOLD),
+        (BOOK_IMG, CONFIDENCE_MEDIUM_THRESHOLD),
+    ]
+    for img, threshold in settlement_markers:
+        coords, _ = find_on_screen(get_template(img), screen_cv, region, threshold=threshold)
+        if coords:
+            return True
+
+    # WILD_EARTH без кнопки village — возможно поселение (fallback)
     wild_coords, _ = find_on_screen(get_template(WILD_EARTH_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if wild_coords:
         return True
+
     return False
 
 
 def ensure_exit_to_main_screen(window, region, max_attempts=10):
     """
-    Пытаться выйти в окно поселения, пока не увидим WILD_EARTH_IMG/VILLAGE_IMG.
-    Если видна кнопка village — нажимаем на неё, чтобы вернуться в поселение.
+    Пытаться выйти в окно поселения.
+    Если бот на карте мира (видна кнопка "в поселение") — нажимаем её.
+    Иначе закрываем случайные меню через back/close.
     Возвращает True если выход подтверждён, False если превышено число попыток.
     """
     for attempt in range(1, max_attempts + 1):
         screen_cv = take_screenshot(window, region)
         if _is_at_main_screen_village(screen_cv, region):
-            logger.info("[EXIT] Подтверждён выход в окно поселения (wild/village видно).")
+            logger.info("[EXIT] Подтверждён выход в окно поселения.")
             return True
 
-        # Если видна кнопка village — нажимаем на неё, чтобы вернуться в поселение
+        # На карте мира — нажимаем кнопку "в поселение"
         village_coords, village_conf = find_and_click(VILLAGE_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        if village_coords:
+            logger.info(f"[EXIT] Попытка {attempt}/{max_attempts}: нажимаем кнопку 'в поселение' (conf={village_conf:.3f})")
+            time.sleep(1.0)
+            continue
 
+        # Закрываем случайные меню / попапы
         logger.info(f"[EXIT] Попытка выхода {attempt}/{max_attempts}: нажимаем back.png")
         find_and_click(BACK_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
-        time.sleep(0.5)
+        time.sleep(1.0)
         screen_cv = take_screenshot(window, region)
         if _is_at_main_screen_village(screen_cv, region):
             return True
 
         logger.info(f"[EXIT] Попытка выхода {attempt}/{max_attempts}: нажимаем close.png")
         find_and_click(CLOSE_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
-        time.sleep(0.5)
+        time.sleep(1.0)
 
     logger.warning("[EXIT] Не удалось подтвердить выход в окно поселения после всех попыток.")
     return False
@@ -286,7 +321,7 @@ def handle_reconnect(screen_cv, region):
     found, _ = find_and_click_no_logs(RECONNECT_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if found:
         logger.info("[RECONNECT] Нажата кнопка переподключения")
-        time.sleep(3)
+        time.sleep(10)
         return True
     return False
 
@@ -299,7 +334,7 @@ def handle_reconnect_repeat(screen_cv, region):
     found, _ = find_and_click_no_logs(RECONNECT_REPEAT_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if found:
         logger.info("[RECONNECT_REPEAT] Нажата кнопка переподключения")
-        time.sleep(3)
+        time.sleep(10)
         return True
     return False
 

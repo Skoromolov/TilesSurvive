@@ -166,14 +166,14 @@ def main():
             # --- Режим HEAL ---
             elif current_mode == MainMode.HEAL:
                 last_heal_state = process_heal(screen_cv, region, last_heal_state, window)
-                # HEAL остаётся активным, пока не завершит лечение или не уйдёт в UNKNOWN/MAIN_SCREEN
+                # HEAL завершается только при COMPLETED или UNKNOWN
                 if last_heal_state == HealState.UNKNOWN:
                     logger.info("[MAIN] HEAL завершён или неизвестное состояние, запускаем выход в поселение")
                     _return_to_main_screen(window, region, "HEAL")
                     current_mode = MainMode.DEFAULT
                     last_heal_state = None
-                elif last_heal_state == HealState.MAIN_SCREEN:
-                    logger.info("[MAIN] HEAL: вернулись на главный экран, возврат в DEFAULT")
+                elif last_heal_state == HealState.COMPLETED:
+                    logger.info("[MAIN] HEAL завершён, возврат в DEFAULT")
                     current_mode = MainMode.DEFAULT
                     last_heal_state = None
                 continue
