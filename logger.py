@@ -13,7 +13,7 @@ LOG_FILE = os.path.join(LOG_DIR, 'bot.log')
 
 # Create logger
 logger = logging.getLogger('heal_raid_bot')
-logger.setLevel(logging.DEBUG)  # Capture all levels, handlers will filter
+logger.setLevel(logging.INFO)  # Capture all levels, handlers will filter
 
 # Avoid adding handlers multiple times
 if not logger.handlers:
@@ -24,7 +24,7 @@ if not logger.handlers:
         backupCount=5,
         encoding='utf-8'
     )
-    file_handler.setLevel(logging.DEBUG)
+    file_handler.setLevel(logging.INFO)
 
     # Console handler
     console_handler = logging.StreamHandler()

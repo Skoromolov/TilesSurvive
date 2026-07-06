@@ -110,7 +110,7 @@ def main():
 
             # --- DEFAULT: выбор режима на основе экрана и настроек ---
             if current_mode == MainMode.DEFAULT:
-                logger.info(f"[MAIN] DEFAULT: выбор режима")
+                logger.debug("[MAIN] DEFAULT: выбор режима")
 
                 # 1. Принудительный режим RAID
                 if FORCE_RAID_ONLY and not FORCE_HEAL_ONLY:
@@ -168,7 +168,7 @@ def main():
                     continue
 
                 # 7. Иначе — лечение как дефолтная активность
-                logger.info("[MAIN] Переключение в режим HEAL (дефолт)")
+                logger.debug("[MAIN] Переключение в режим HEAL (дефолт)")
                 current_mode = MainMode.HEAL
                 last_heal_state = None
                 continue
@@ -183,7 +183,7 @@ def main():
                     current_mode = MainMode.DEFAULT
                     last_heal_state = None
                 elif last_heal_state == HealState.COMPLETED:
-                    logger.info("[MAIN] HEAL завершён, возврат в DEFAULT")
+                    logger.debug("[MAIN] HEAL завершён, возврат в DEFAULT")
                     current_mode = MainMode.DEFAULT
                     last_heal_state = None
                 continue
