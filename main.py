@@ -23,6 +23,12 @@ from adventure import process_adventure_state, determine_adventure_state, reset_
 from logger import logger  # Импортируем логгер
 
 
+# Вывод PID процесса при старте
+_pid = os.getpid()
+print(f"[MAIN] Запуск бота, PID={_pid}")
+logger.info(f"[MAIN] Запуск бота, PID={_pid}")
+
+
 # ==========================================
 # ВЫХОД В ОКНО ПОСЕЛЕНИЯ ПЕРЕД DEFAULT
 # ==========================================
@@ -76,6 +82,10 @@ def main():
             win32gui.SetForegroundWindow(window._hWnd)
             # Сделать скриншот
             screen_cv = take_screenshot(window, region)
+            if screen_cv is None:
+                logger.warning("[MAIN] Не удалось получить скриншот, пропускаем итерацию.")
+                time.sleep(1)
+                continue
 
             # Обрезаем правую панель инструментов BlueStacks (~40 px),
             # чтобы шаблоны не матчились на toolbar иконках (like, share и т.д.)

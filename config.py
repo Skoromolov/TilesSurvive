@@ -39,13 +39,13 @@ FAST_HEAL_FROM_MAP_ENABLED = False
 GOLD_INTERVAL = 2700          # Интервал между успешными золотодобычами (30 минут)
 GOLD_LEVEL = 6                # Уровень рудника 1-6, на котором работаем
 # Длительность одной добычи: через сколько секунд отзывать отряд и искать новое место
-GOLD_MINING_DURATION = 2700   # 45 минут — по истечении отзываем отряд и ищем новое место
+GOLD_MINING_DURATION = 2760   # 46 минут — с запасом, т.к. игра не даёт отозвать раньше 45 мин (уровни 5-6)
 GOLD_SEARCH_TIMEOUT = 600     # Таймаут поиска рудника в секундах
 GOLD_TIMEOUT = 300            # Таймаут всего процесса золотодобычи (5 минут)
 GOLD_LEVEL_CONFIDENCE_THRESHOLD = 0.90  # Порог для current_lvl_X (было 0.95 — слишком высоко)
 GOLD_LIST_LEVEL_CONFIDENCE_THRESHOLD = 0.90  # Порог для lvl_X в списке
-GOLD_LOOP_DELAY = 0.1         # Задержка между итерациями в режиме GOLD (сек)
-GOLD_ACTION_DELAY = 0.1      # Короткая пауза после клика внутри gold-процесса (сек)
+GOLD_LOOP_DELAY = 0.2         # Задержка между итерациями в режиме GOLD (сек)
+GOLD_ACTION_DELAY = 0.2      # Короткая пауза после клика внутри gold-процесса (сек)
 
 # ==========================================
 # КОНСТАНТЫ ИЗОБРАЖЕНИЙ
@@ -126,6 +126,8 @@ GOLD_GO_IMG = FOLDER + FOLDER_GOLD + 'go.png'
 GOLD_MOVEON_IMG = FOLDER + FOLDER_GOLD + 'moveOn.png'
 GOLD_FINISH_IMG = FOLDER + FOLDER_GOLD + 'finish.png'
 GOLD_CONFIRM_IMG = FOLDER + FOLDER_GOLD + 'confirm.png'
+GOLD_ADVICE_IMG = FOLDER + FOLDER_GOLD + 'advice.png'
+GOLD_CONFIRM_ORANGE_IMG = FOLDER + FOLDER_GOLD + 'confirm_orange.png'
 GOLD_SUMMARY_STRENGTH_TEXT_IMG = FOLDER + FOLDER_GOLD + 'summary_strength_text.png'
 GOLD_HAND_IMG = FOLDER + FOLDER_GOLD + 'hand.png'
 GOLD_NO_FREE_RUDNIK_IMG = FOLDER + FOLDER_GOLD + 'no_free_rudnik.png'
@@ -248,4 +250,5 @@ class GoldState(Enum):
     RECONNECT_REPEAT_POPUP = "reconnect_repeat_popup"
     FREE_PLACE_VISIBLE = "free_place_visible"
     NO_FREE_RUDNIK = "no_free_rudnik"
+    ADVICE_VISIBLE = "advice_visible"
     COMPLETED = "completed"

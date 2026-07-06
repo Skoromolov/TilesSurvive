@@ -74,13 +74,41 @@ def get_template(template_path):
 # ==========================================
 # СКРИНШОТЫ
 # ==========================================
+def _ensure_bgr_uint8(screen_cv):
+    """Привести скриншот к валидному BGR uint8 3-канальному ndarray."""
+    if screen_cv is None or not isinstance(screen_cv, np.ndarray):
+        return None
+    if screen_cv.dtype != np.uint8:
+        screen_cv = screen_cv.astype(np.uint8)
+    if screen_cv.ndim == 2:
+        screen_cv = cv2.cvtColor(screen_cv, cv2.COLOR_GRAY2BGR)
+    elif screen_cv.ndim == 3 and screen_cv.shape[2] == 4:
+        screen_cv = cv2.cvtColor(screen_cv, cv2.COLOR_BGRA2BGR)
+    elif screen_cv.ndim == 3 and screen_cv.shape[2] != 3:
+        # Drop/convert any other channel count to BGR
+        screen_cv = cv2.cvtColor(screen_cv, cv2.COLOR_BGRA2BGR)
+    elif screen_cv.ndim not in (2, 3):
+        return None
+    return screen_cv
+
+
 def take_screenshot(window, region):
     """
     Создать скриншот области окна через win32 API.
     Фолбэк на pyautogui при ошибке.
+    Возвращает None если region невалиден или скриншот получить не удалось.
     """
+    if region is None:
+        return None
     x, y, w, h = region
-    hwnd = window._hWnd
+    if w <= 0 or h <= 0:
+        logger.warning(f"[СКРИНШОТ] Невалидный region: {region}")
+        return None
+
+    hwnd = getattr(window, '_hWnd', None)
+    if hwnd is None:
+        logger.warning("[СКРИНШОТ] Нет hwnd окна.")
+        return None
 
     try:
         hwndDC = win32gui.GetWindowDC(hwnd)
@@ -95,6 +123,14 @@ def take_screenshot(window, region):
 
         signedIntsArray = saveBitMap.GetBitmapBits(True)
         img = np.frombuffer(signedIntsArray, dtype='uint8')
+        expected_size = h * w * 4
+        if img.size != expected_size:
+            logger.warning(f"[СКРИНШОТ] Размер bitmap не совпадает: {img.size} != {expected_size}")
+            win32gui.DeleteObject(saveBitMap.GetHandle())
+            saveDC.DeleteDC()
+            mfcDC.DeleteDC()
+            win32gui.ReleaseDC(hwnd, hwndDC)
+            return None
         img.shape = (h, w, 4)
 
         win32gui.DeleteObject(saveBitMap.GetHandle())
@@ -103,16 +139,17 @@ def take_screenshot(window, region):
         win32gui.ReleaseDC(hwnd, hwndDC)
 
         screen_cv = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
-        return screen_cv
+        return _ensure_bgr_uint8(screen_cv)
 
     except Exception as e:
         logger.info(f"[СКРИНШОТ] win32 не сработал: {e}")
-        screenshot = pyautogui.screenshot(region=region)
-        screen_cv = np.array(screenshot)
-        if screen_cv.dtype != np.uint8:
-            screen_cv = screen_cv.astype(np.uint8)
-        screen_cv = cv2.cvtColor(screen_cv, cv2.COLOR_RGB2BGR)
-        return screen_cv
+        try:
+            screenshot = pyautogui.screenshot(region=region)
+            screen_cv = np.array(screenshot)
+            return _ensure_bgr_uint8(screen_cv)
+        except Exception as e2:
+            logger.error(f"[СКРИНШОТ] pyautogui фолбэк тоже не сработал: {e2}")
+            return None
 
 
 # ==========================================
@@ -123,6 +160,20 @@ def find_on_screen(template, screen_cv, region, threshold=CONFIDENCE_THRESHOLD):
     Найти шаблон на экране через matchTemplate.
     Возвращает: ((center_x, center_y), confidence) или (None, max_val)
     """
+    if screen_cv is None or template is None:
+        return None, 0.0
+    if not isinstance(screen_cv, np.ndarray) or not isinstance(template, np.ndarray):
+        return None, 0.0
+    if screen_cv.ndim != 3 or screen_cv.shape[2] != 3:
+        logger.warning(f"[find_on_screen] Невалидный screen_cv: shape={screen_cv.shape}, dtype={screen_cv.dtype}")
+        return None, 0.0
+    if template.ndim != 3 or template.shape[2] != 3:
+        logger.warning(f"[find_on_screen] Невалидный template: shape={template.shape}, dtype={template.dtype}")
+        return None, 0.0
+    if screen_cv.shape[0] < template.shape[0] or screen_cv.shape[1] < template.shape[1]:
+        logger.warning(f"[find_on_screen] Скриншот меньше шаблона: screen={screen_cv.shape}, template={template.shape}")
+        return None, 0.0
+
     res = cv2.matchTemplate(screen_cv, template, cv2.TM_CCOEFF_NORMED)
     min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
 
@@ -141,6 +192,9 @@ def find_and_click(template_path, screen_cv, region, threshold=CONFIDENCE_THRESH
     Найти шаблон (с кэшированием) и кликнуть по нему.
     Возвращает: (found: bool, coords: tuple or None)
     """
+    if screen_cv is None or region is None:
+        logger.warning(f"[find_and_click] Невалидные входные данные: screen_cv={screen_cv}, region={region}")
+        return False, None
     template = get_template(template_path)
     if template is None:
         logger.error(f"[find_and_click] шаблон не найден: {template_path}")
@@ -151,7 +205,11 @@ def find_and_click(template_path, screen_cv, region, threshold=CONFIDENCE_THRESH
     if coords:
         if conf >= threshold:
             logger.info(f"[find_and_click] ✓ найден: {template_path} (conf={conf:.3f}, coords={coords})")
-            pyautogui.click(coords[0], coords[1])
+            try:
+                pyautogui.click(coords[0], coords[1])
+            except pyautogui.FailSafeException:
+                logger.error("[find_and_click] Fail-safe сработал — мышь в углу экрана. Пропускаем клик.")
+                return False, coords
             # print(f"[find_and_click] ✓ клик выполнен по: {template_path}")
             return True, coords
         else:
@@ -166,6 +224,8 @@ def find_and_click_no_logs(template_path, screen_cv, region, threshold=CONFIDENC
     Найти шаблон (с кэшированием) и кликнуть по нему.
     Возвращает: (found: bool, coords: tuple or None)
     """
+    if screen_cv is None or region is None:
+        return False, None
     template = get_template(template_path)
     if template is None:
         return False, None
@@ -174,7 +234,10 @@ def find_and_click_no_logs(template_path, screen_cv, region, threshold=CONFIDENC
 
     if coords:
         if conf >= threshold:
-            pyautogui.click(coords[0], coords[1])
+            try:
+                pyautogui.click(coords[0], coords[1])
+            except pyautogui.FailSafeException:
+                return False, coords
             return True, coords
         else:
             return False, None
@@ -187,8 +250,17 @@ def find_all_on_screen(template, screen_cv, region, threshold=CONFIDENCE_THRESHO
     Найти ВСЕ вхождения шаблона на экране с помощью matchTemplate + non-max suppression.
     Возвращает: [(center_x, center_y, conf), ...] в координатах экрана.
     """
-    if template is None:
+    if template is None or screen_cv is None:
         return []
+    if not isinstance(screen_cv, np.ndarray) or not isinstance(template, np.ndarray):
+        return []
+    if screen_cv.ndim != 3 or screen_cv.shape[2] != 3:
+        return []
+    if template.ndim != 3 or template.shape[2] != 3:
+        return []
+    if screen_cv.shape[0] < template.shape[0] or screen_cv.shape[1] < template.shape[1]:
+        return []
+
     res = cv2.matchTemplate(screen_cv, template, cv2.TM_CCOEFF_NORMED)
     loc = np.where(res >= threshold)
     h, w = template.shape[:2]

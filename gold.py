@@ -122,14 +122,28 @@ def _check_mining_result(screen_after, region):
     Проверить результат отправки отряда на скриншоте.
     Возвращает:
         ('completed', None) — отряд отправлен (return.png / my_rudnik.png видны)
-        ('summary', None) — окно 'Общая сила' осталось открытым
-        ('unknown', None) — окно закрылось, состояние не определено
+        ('summary', None) — открылось окно 'Общая сила' с кнопкой 'Добывать'
+        ('go', None)       — открылось окно отправки отряда с кнопкой 'Марш'
+        ('unknown', None)  — окно закрылось, состояние не определено
     """
+    if screen_after is None:
+        return 'unknown', None
     return_coords, _ = find_on_screen(get_template(GOLD_RETURN_IMG), screen_after, region)
     my_rudnik_coords, _ = find_on_screen(get_template(GOLD_MY_RUDNIK_IMG), screen_after, region)
     if return_coords or my_rudnik_coords:
         return 'completed', None
 
+    # Окно с кнопкой 'Марш' (GO) имеет приоритет — по нему нужно нажать GO
+    go_coords, _ = find_on_screen(get_template(GOLD_GO_IMG), screen_after, region)
+    if go_coords:
+        return 'go', None
+
+    # Окно с кнопкой 'Добывать' — занятое место
+    work_coords, _ = find_on_screen(get_template(GOLD_WORK_IMG), screen_after, region)
+    if work_coords:
+        return 'summary', None
+
+    # Если summary text остался, но ни work ни go не видны — значит это непонятный попап
     summary_coords, _ = find_on_screen(get_template(GOLD_SUMMARY_STRENGTH_TEXT_IMG), screen_after, region)
     if summary_coords:
         return 'summary', None
@@ -137,26 +151,33 @@ def _check_mining_result(screen_after, region):
     return 'unknown', None
 
 
-def _ensure_target_level(screen_cv, region, log_prefix="[GOLD]"):
+def _ensure_target_level(screen_cv, region, window=None, log_prefix="[GOLD]"):
     """
     Проверить текущий уровень рудника.
     Если уровень не целевой — открыть выбор уровня и вернуть SELECT_LEVEL_VISIBLE.
     Если целевой — сбросить need_level_check и вернуть None.
     Если уровень не распознан и есть select_level.png — тоже открываем выбор.
     """
-    # Try to detect current level a few times (UI may not be fully loaded yet)
+    current_screen = screen_cv
     max_attempts = 3
     for attempt in range(1, max_attempts + 1):
-        current = get_current_level(screen_cv, region)
+        current = get_current_level(current_screen, region)
         if current is not None:
             break
         if attempt < max_attempts:
-            time.sleep(GOLD_ACTION_DELAY / 2)  # short pause between attempts
+            # Делаем свежий скриншот между попытками, иначе 3 попытки на одном кадре бесполезны
+            if window is not None:
+                time.sleep(GOLD_ACTION_DELAY / 2)
+                current_screen = take_screenshot(window, region)
+                if current_screen is None:
+                    current_screen = screen_cv
+            else:
+                time.sleep(GOLD_ACTION_DELAY / 2)
 
     if current is not None and current != GOLD_LEVEL:
         logger.info(f"{log_prefix} Уровень {current}, нужен {GOLD_LEVEL}. Открываем выбор уровня.")
         _gold_ctx['need_level_check'] = True
-        find_and_click(GOLD_SELECT_LEVEL_IMG, screen_cv, region)
+        find_and_click(GOLD_SELECT_LEVEL_IMG, current_screen, region)
         _gold_ctx['expected'] = 'level_list'
         _gold_ctx['level_select_scroll_tries'] = 0
         time.sleep(GOLD_ACTION_DELAY)
@@ -168,11 +189,11 @@ def _ensure_target_level(screen_cv, region, log_prefix="[GOLD]"):
         return None
 
     # Уровень не распознан — пробуем открыть выбор уровня
-    select_coords, _ = find_on_screen(get_template(GOLD_SELECT_LEVEL_IMG), screen_cv, region)
+    select_coords, _ = find_on_screen(get_template(GOLD_SELECT_LEVEL_IMG), current_screen, region)
     if select_coords:
         logger.info(f"{log_prefix} Текущий уровень не виден после {max_attempts} попыток. Открываем выбор уровня.")
         _gold_ctx['need_level_check'] = True
-        find_and_click(GOLD_SELECT_LEVEL_IMG, screen_cv, region)
+        find_and_click(GOLD_SELECT_LEVEL_IMG, current_screen, region)
         _gold_ctx['expected'] = 'level_list'
         _gold_ctx['level_select_scroll_tries'] = 0
         time.sleep(GOLD_ACTION_DELAY)
@@ -225,13 +246,18 @@ def _check_recall_needed():
     return 'sync', remaining
 
 
-def _take_result_screenshot(window, region):
+def _take_result_screenshot(window, region, delay=None):
     """Сделать скриншот после клика и подождать GOLD_ACTION_DELAY."""
-    time.sleep(GOLD_ACTION_DELAY)
-    return take_screenshot(window, region)
+    if delay is None:
+        delay = GOLD_ACTION_DELAY
+    time.sleep(delay)
+    screen_after = take_screenshot(window, region)
+    if screen_after is None:
+        logger.warning("[GOLD] Не удалось получить скриншот результата, берём старый кадр.")
+    return screen_after
 
 
-def _click_and_check_completion(button_img, log_msg, window, screen_cv, region):
+def _click_and_check_completion(button_img, log_msg, window, screen_cv, region, post_click_delay=None, max_attempts=1):
     """
     Нажать кнопку отправки отряда и проверить результат.
     Возвращает:
@@ -244,13 +270,20 @@ def _click_and_check_completion(button_img, log_msg, window, screen_cv, region):
     if not clicked:
         return 'other', screen_cv
 
-    screen_after = _take_result_screenshot(window, region)
-    result, _ = _check_mining_result(screen_after, region)
-    if result == 'completed':
-        return 'completed', None
-    if result == 'summary':
-        return 'summary', None
-    return 'other', screen_after
+    for attempt in range(1, max_attempts + 1):
+        screen_after = _take_result_screenshot(window, region, delay=post_click_delay)
+        if screen_after is None:
+            continue
+        result, _ = _check_mining_result(screen_after, region)
+        if result == 'completed':
+            return 'completed', None
+        if result == 'summary':
+            return 'summary', None
+        # Если не завершено и не summary, возможно появится GO/MARCH позже.
+        # Повторяем скриншот до max_attempts.
+        if attempt < max_attempts:
+            logger.debug(f"[GOLD] Попытка {attempt}: результат не определён, ждём ещё.")
+    return 'other', screen_after if screen_after is not None else screen_cv
 
 
 def _close_to_rudkin_tab(screen_cv, region, window):
@@ -259,10 +292,14 @@ def _close_to_rudkin_tab(screen_cv, region, window):
     time.sleep(GOLD_ACTION_DELAY)
     # Verify we are back at rudnik_tab by checking for find or select_level
     screen_after = take_screenshot(window, region)
+    if screen_after is None:
+        logger.warning("[GOLD] Не удалось получить скриншот после закрытия попапа.")
+        return GoldState.UNKNOWN
     find_visible, _ = find_on_screen(get_template(GOLD_FIND_IMG), screen_after, region)
     select_visible, _ = find_on_screen(get_template(GOLD_SELECT_LEVEL_IMG), screen_after, region)
     if find_visible or select_visible:
         _gold_ctx['expected'] = 'rudnik_tab'
+        _gold_ctx['need_level_check'] = True  # после закрытия попапа уровень может измениться
         return GoldState.RUDNIK_TAB
     else:
         # If not sure, return UNKNOWN to let recovery handle it
@@ -445,36 +482,44 @@ def determine_gold_state(screen_cv, region):
     if coords:
         return GoldState.FINISH_VISIBLE
 
-    # 4. Подтверждение после завершения
+    # 4. Подтверждение после завершения / попап "СОВЕТ"
+    # Сначала проверяем оранжевую кнопку подтверждения в попапе "СОВЕТ" —
+    # она имеет приоритет, т.к. это блокирующий попап.
+    coords, _ = find_on_screen(get_template(GOLD_ADVICE_IMG), screen_cv, region)
+    if coords:
+        return GoldState.ADVICE_VISIBLE
     coords, _ = find_on_screen(get_template(GOLD_CONFIRM_IMG), screen_cv, region)
     if coords:
         return GoldState.CONFIRM_VISIBLE
 
-    # 5. Попап "SummaryStrenghtText" — место занято
+    # 5. Окно отправки отряда / кнопка "Марш" (имеет приоритет над summary,
+    #    т.к. на этом экране тоже виден текст "Общая сила ваших отрядов")
+    coords, _ = find_on_screen(get_template(GOLD_GO_IMG), screen_cv, region)
+    if coords:
+        return GoldState.GO_VISIBLE
+
+    # 6. Попап "SummaryStrenghtText" — место занято (кнопка "Добывать")
     coords, _ = find_on_screen(get_template(GOLD_SUMMARY_STRENGTH_TEXT_IMG), screen_cv, region)
     if coords:
         return GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE
 
-    # 6. Мой рудник / активная добыча — проверяем ДО return.png,
+    # 7. Мой рудник / активная добыча — проверяем ДО return.png,
     #    т.к. return.png видна на экране добычи всегда (как кнопка отзыва)
     coords, _ = find_on_screen(get_template(GOLD_MY_RUDNIK_IMG), screen_cv, region)
     if coords:
         return GoldState.MY_RUDNIK_VISIBLE
 
-    # 7. Иконка активного уровня добычи
+    # 8. Иконка активного уровня добычи
     coords, _ = find_on_screen(get_template(GOLD_CURRENT_RAID_LEVEL_ICON_IMG), screen_cv, region)
     if coords:
         return GoldState.RAID_LEVEL_ICON_VISIBLE
 
-    # 8. Кнопка "Отозвать" на экране рудника
+    # 9. Кнопка "Отозвать" на экране рудника
     coords, _ = find_on_screen(get_template(GOLD_RETURN_IMG), screen_cv, region)
     if coords:
         return GoldState.RETURN_BUTTON_VISIBLE
 
-    # 9. Цепочка добычи / марш
-    coords, _ = find_on_screen(get_template(GOLD_GO_IMG), screen_cv, region)
-    if coords:
-        return GoldState.GO_VISIBLE
+    # 10. Цепочка добычи / марш (work/grind если go уже проверили выше)
     coords, _ = find_on_screen(get_template(GOLD_WORK_IMG), screen_cv, region)
     if coords:
         return GoldState.WORK_VISIBLE
@@ -634,6 +679,30 @@ def process_gold(screen_cv, region, last_gold_state, window):
         _gold_ctx['expected'] = 'rudnik_tab'
         return GoldState.RUDNIK_TAB
 
+    # ---- ADVICE / 45-MIN POPUP ----
+    if current_state == GoldState.ADVICE_VISIBLE:
+        # Попап "СОВЕТ" с ограничением отзыва раньше 45 минут (для уровней 5-6).
+        # Подтверждаем его и синхронизируем таймеры, чтобы не пытаться отозвать сразу снова.
+        if _gold_ctx.get('recall_requested'):
+            logger.info("[GOLD] Попап 'СОВЕТ': отзыв пока невозможен. Подтверждаем.")
+            # Сначала пробуем оранжевую кнопку, потом стандартную confirm.png
+            clicked, _ = find_and_click(GOLD_CONFIRM_ORANGE_IMG, screen_cv, region)
+            if not clicked:
+                find_and_click(GOLD_CONFIRM_IMG, screen_cv, region)
+            # Синхронизируем таймер: считаем, что добыча началась сейчас,
+            # и через GOLD_MINING_DURATION снова попробуем отозвать.
+            start_gold_mission()
+            update_gold_time()
+            _gold_ctx['recall_requested'] = False
+            logger.info("[GOLD] Таймеры синхронизированы после попапа 'СОВЕТ'. Возвращаемся в основной цикл.")
+            return GoldState.COMPLETED
+        logger.info("[GOLD] Нажимаем 'Подтвердить' в попапе 'СОВЕТ'.")
+        clicked, _ = find_and_click(GOLD_CONFIRM_ORANGE_IMG, screen_cv, region)
+        if not clicked:
+            find_and_click(GOLD_CONFIRM_IMG, screen_cv, region)
+        _gold_ctx['need_level_check'] = True
+        return GoldState.RUDNIK_TAB
+
     # ---- CONFIRM BUTTON ----
     if current_state == GoldState.CONFIRM_VISIBLE:
         # Если бот пытался отозвать отряд, а игра показала попап "СОВЕТ" с
@@ -652,37 +721,62 @@ def process_gold(screen_cv, region, last_gold_state, window):
 
     # ---- SUMMARY STRENGTH TEXT POPUP ----
     if current_state == GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE:
+        # Это может быть либо попап с кнопкой 'Добывать' (work.png),
+        # либо уже окно отправки отряда с кнопкой 'Марш' (go.png).
+        go_coords, _ = find_on_screen(get_template(GOLD_GO_IMG), screen_cv, region)
+        if go_coords:
+            logger.info("[GOLD] Открыто окно отправки отряда (кнопка 'Марш'). Нажимаем.")
+            result, _ = _click_and_check_completion(
+                GOLD_GO_IMG,
+                "[GOLD] Нажимаем 'Марш' для отправки отряда.",
+                window, screen_cv, region,
+                post_click_delay=0.5,
+                max_attempts=1
+            )
+            if result == 'completed':
+                return _complete_mission("[GOLD] ✓ Золотодобыча запущена через 'Марш'!")
+            if result in ('summary', 'go'):
+                logger.info("[GOLD] После 'Марш' всё ещё открыто окно отправки/общей силы.")
+                return GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE
+            return GoldState.UNKNOWN
+
         # Сначала пытаемся нажать "Добывать" (join.png / work.png).
         join_coords, _ = find_on_screen(get_template(GOLD_WORK_IMG), screen_cv, region)
         if join_coords:
             result, screen_after = _click_and_check_completion(
                 GOLD_WORK_IMG,
                 "[GOLD] Нажимаем 'Добывать' для отправки отряда.",
-                window, screen_cv, region
+                window, screen_cv, region,
+                post_click_delay=0.2,
+                max_attempts=1
             )
             if result == 'completed':
                 return _complete_mission("[GOLD] ✓ Золотодобыча запущена!")
-            # Check if summary popup still visible on the screen after click
-            still_summary, _ = find_on_screen(get_template(GOLD_SUMMARY_STRENGTH_TEXT_IMG), screen_after, region)
-            if not still_summary:
-                logger.info("[GOLD] Окно 'Общая сила' закрылось после 'Добывать'. Переопределяем состояние.")
-                return GoldState.UNKNOWN
-            logger.info("[GOLD] После 'Добывать' окно осталось — место занято. Закрываем попап.")
-            # Try to click GO button immediately after 'Добывать' when place is occupied
-            go_result, go_screen_after = _click_and_check_completion(
-                GOLD_GO_IMG,
-                "[GOLD] После 'Добывать' место занято, пытаемся нажать 'Марш' (GO).",
-                window, screen_after, region
-            )
-            if go_result == 'completed':
-                return _complete_mission("[GOLD] ✓ Золотодобыча запущена через GO!")
-            if go_result == 'summary':
-                logger.info("[GOLD] После 'GO' открылось окно 'Общая сила'. Обработаем его.")
+            if result == 'go':
+                logger.info("[GOLD] После 'Добывать' открылось окно с 'Марш'. Обработаем его.")
                 return GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE
-            logger.info("[GOLD] После 'Добывать' окно осталось — место занято. Закрываем попап.")
-            return _close_to_rudkin_tab(screen_after, region, window)
+            if result == 'summary':
+                logger.info("[GOLD] После 'Добывать' окно осталось — место занято. Закрываем попап.")
+                return _close_to_rudkin_tab(screen_after, region, window)
+            # result == 'unknown': проверим, не открылось ли GO-окно на всякий случай
+            screen_for_go = screen_after if screen_after is not None else screen_cv
+            go_coords, _ = find_on_screen(get_template(GOLD_GO_IMG), screen_for_go, region)
+            if go_coords:
+                logger.info("[GOLD] После 'Добывать' обнаружено окно с 'Марш'. Обработаем его.")
+                return GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE
 
-        logger.info("[GOLD] В окне 'Общая сила' нет кнопки 'Добывать'. Закрываем попап.")
+            # Если клик 'Добывать' не сработал (окно не закрылось), не уходим в UNKNOWN —
+            # явно проверяем, осталось ли окно, чтобы избежать зацикливания.
+            screen_for_check = screen_after if screen_after is not None else screen_cv
+            still_summary, _ = find_on_screen(get_template(GOLD_SUMMARY_STRENGTH_TEXT_IMG), screen_for_check, region)
+            if still_summary:
+                logger.info("[GOLD] После 'Добывать' окно 'Общая сила' всё ещё открыто. Повторим попытку.")
+                return GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE
+
+            logger.info("[GOLD] После 'Добывать' окно 'Общая сила' закрылось. Переопределяем состояние.")
+            return GoldState.UNKNOWN
+
+        logger.info("[GOLD] В окне 'Общая сила' нет кнопки 'Добывать'/'Марш'. Закрываем попап.")
         return _close_to_rudkin_tab(screen_cv, region, window)
 
     # ---- GO / WORK / GRIND ----
@@ -690,45 +784,56 @@ def process_gold(screen_cv, region, last_gold_state, window):
         result, screen_after = _click_and_check_completion(
             GOLD_GO_IMG,
             "[GOLD] Нажимаем 'GO' для отправки отряда.",
-            window, screen_cv, region
+            window, screen_cv, region,
+            post_click_delay=0.5,
+            max_attempts=1
         )
         if result == 'completed':
             return _complete_mission("[GOLD] ✓ Золотодобыча запущена!")
-        if result == 'summary':
-            logger.info("[GOLD] После 'GO' открылось окно 'Общая сила'. Обработаем его.")
+        if result in ('summary', 'go'):
+            logger.info("[GOLD] После 'GO' всё ещё открыто окно отправки/общей силы. Обработаем его.")
             return GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE
 
         # GO нажали, но результата нет — проверяем, не застряли ли в попапе
-        work_coords, _ = find_on_screen(get_template(GOLD_WORK_IMG), screen_after, region)
-        go_coords, _ = find_on_screen(get_template(GOLD_GO_IMG), screen_after, region)
+        screen_for_check = screen_after if screen_after is not None else screen_cv
+        work_coords, _ = find_on_screen(get_template(GOLD_WORK_IMG), screen_for_check, region)
+        go_coords, _ = find_on_screen(get_template(GOLD_GO_IMG), screen_for_check, region)
         if work_coords or go_coords:
             logger.info("[GOLD] Застряли в попапе (видны work/go). Закрываем.")
-            find_and_click(GOLD_CLOSE_IMG, screen_after, region)
+            find_and_click(GOLD_CLOSE_IMG, screen_for_check, region)
             time.sleep(GOLD_ACTION_DELAY)
             # После закрытия попапа проверяем, не вернулись ли в rudnik_tab
             screen_after_close = _take_result_screenshot(window, region)
-            find_after, _ = find_on_screen(get_template(GOLD_FIND_IMG), screen_after_close, region)
-            select_after, _ = find_on_screen(get_template(GOLD_SELECT_LEVEL_IMG), screen_after_close, region)
-            if find_after or select_after:
-                logger.info("[GOLD] После закрытия попапа вернулись в rudnik_tab. Продолжаем поиск.")
-                _gold_ctx['expected'] = 'rudnik_tab'
-                _gold_ctx['find_started_at'] = None
-                return GoldState.RUDNIK_TAB
+            if screen_after_close is not None:
+                find_after, _ = find_on_screen(get_template(GOLD_FIND_IMG), screen_after_close, region)
+                select_after, _ = find_on_screen(get_template(GOLD_SELECT_LEVEL_IMG), screen_after_close, region)
+                if find_after or select_after:
+                    logger.info("[GOLD] После закрытия попапа вернулись в rudnik_tab. Продолжаем поиск.")
+                    _gold_ctx['expected'] = 'rudnik_tab'
+                    _gold_ctx['need_level_check'] = True
+                    _gold_ctx['find_started_at'] = None
+                    return GoldState.RUDNIK_TAB
 
         _gold_ctx['expected'] = 'rudnik_tab'
+        _gold_ctx['need_level_check'] = True
         return GoldState.RUDNIK_TAB
 
     if current_state == GoldState.WORK_VISIBLE:
         result, _ = _click_and_check_completion(
             GOLD_WORK_IMG,
             "[GOLD] Нажимаем 'WORK' для отправки отряда.",
-            window, screen_cv, region
+            window, screen_cv, region,
+            post_click_delay=0.2,
+            max_attempts=1
         )
         if result == 'completed':
             return _complete_mission("[GOLD] ✓ Золотодобыча запущена!")
         if result == 'summary':
             logger.info("[GOLD] После 'WORK' открылось окно 'Общая сила'. Обработаем его.")
             return GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE
+        if result == 'go':
+            logger.info("[GOLD] После 'WORK' открылось окно с 'Марш'. Обработаем его.")
+            return GoldState.GO_VISIBLE
 
         return GoldState.GO_VISIBLE
 
@@ -736,38 +841,64 @@ def process_gold(screen_cv, region, last_gold_state, window):
         result, screen_after = _click_and_check_completion(
             GOLD_GRIND_IMG,
             "[GOLD] Нажимаем 'GRIND'.",
-            window, screen_cv, region
+            window, screen_cv, region,
+            post_click_delay=0.2,
+            max_attempts=1
         )
         if result == 'completed':
             return _complete_mission("[GOLD] ✓ Золотодобыча запущена!")
         if result == 'summary':
             logger.info("[GOLD] После 'GRIND' открылось окно 'Общая сила'.")
             return GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE
+        if result == 'go':
+            logger.info("[GOLD] После 'GRIND' открылось окно с 'Марш'. Обработаем его.")
+            return GoldState.GO_VISIBLE
 
-        free_coords, _ = find_on_screen(get_template(GOLD_FREE_PLACE_IMG), screen_after, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
+        screen_for_check = screen_after if screen_after is not None else screen_cv
+        free_coords, _ = find_on_screen(get_template(GOLD_FREE_PLACE_IMG), screen_for_check, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
         if free_coords:
             logger.info("[GOLD] После 'GRIND' найдено свободное место.")
             return GoldState.FREE_PLACE_VISIBLE
 
-        logger.info("[GOLD] После 'GRIND' не появилось окна отправки. Продолжаем поиск.")
-        return GoldState.UNKNOWN
+        _gold_ctx['expected'] = 'rudnik_tab'
+        _gold_ctx['need_level_check'] = True
+        return GoldState.RUDNIK_TAB
 
     # ---- FREE PLACE ----
     if current_state == GoldState.FREE_PLACE_VISIBLE:
-        level_state = _ensure_target_level(screen_cv, region)
+        level_state = _ensure_target_level(screen_cv, region, window=window)
         if level_state is not None:
             return level_state
 
         result, screen_after = _click_and_check_completion(
             GOLD_FREE_PLACE_IMG,
             "[GOLD] Нажимаем свободное место.",
-            window, screen_cv, region
+            window, screen_cv, region,
+            post_click_delay=0.2,
+            max_attempts=1
         )
         if result == 'completed':
             return _complete_mission("[GOLD] ✓ Золотодобыча запущена!")
+        if result == 'go':
+            logger.info("[GOLD] После 'FREE_PLACE' открылось окно с 'Марш'. Обработаем его.")
+            return GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE
         if result == 'summary':
             logger.info("[GOLD] После 'FREE_PLACE' открылось окно 'Общая сила'.")
             return GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE
+
+        screen_for_check = screen_after if screen_after is not None else screen_cv
+        # Если после нажатия ничего не изменилось — возможно, клик не прошёл
+        still_free, _ = find_on_screen(get_template(GOLD_FREE_PLACE_IMG), screen_for_check, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
+        if still_free:
+            logger.info("[GOLD] Свободное место всё ещё видно. Попробуем кликнуть ещё раз в следующей итерации.")
+            _gold_ctx['expected'] = 'free_place'
+            return GoldState.FREE_PLACE_VISIBLE
+
+        # Проверим, не открылось ли GO-окно
+        go_coords, _ = find_on_screen(get_template(GOLD_GO_IMG), screen_for_check, region)
+        if go_coords:
+            logger.info("[GOLD] После 'FREE_PLACE' открылось окно с 'Марш' (быстрая проверка). Обработаем его.")
+            return GoldState.GO_VISIBLE
 
         logger.info("[GOLD] После 'FREE_PLACE' не появилось окна отправки. Продолжаем.")
         return GoldState.UNKNOWN
@@ -818,7 +949,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
         _gold_ctx['raid_icon_clicks'] = 0
         _gold_ctx['find_started_at'] = None  # сброс таймаута поиска
 
-        level_state = _ensure_target_level(screen_cv, region)
+        level_state = _ensure_target_level(screen_cv, region, window=window)
         if level_state is not None:
             return level_state
 
