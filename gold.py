@@ -71,6 +71,13 @@ def gold_mission_active():
     """Отряд отправлен добывать золото и ещё не отозван."""
     return _gold_ctx.get('started_at') is not None and not _gold_ctx['recall_requested']
 
+
+def gold_mission_should_recall():
+    """Пора отозвать отряд (45 минут прошли)."""
+    recall_status, _ = _check_recall_needed()
+    return recall_status == 'recall'
+
+
 def update_gold_time():
     """Обновить время последнего посещения рудника и сохранить в файл."""
     global last_gold_time
