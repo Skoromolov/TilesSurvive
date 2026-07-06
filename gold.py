@@ -8,13 +8,15 @@ import cv2
 from config import *
 from utils import *
 from logger import logger  # Импортируем логгер
+from state import load_state, update_state, LAST_GOLD_TIME_KEY, STARTED_AT_KEY, RECALL_REQUESTED_KEY
 
 
 # ==========================================
 # ПЕРЕМЕННЫЕ СОСТОЯНИЙ ЗОЛОТА
 # ==========================================
-last_gold_time = time.time()
-gold_first_run = True         # при первом запуске сразу идём в золото после heal/raid, не ждём GOLD_INTERVAL
+# Загружаем сохранённое состояние, чтобы таймеры переживали перезапуск скрипта.
+_saved_state = load_state()
+last_gold_time = _saved_state.get(LAST_GOLD_TIME_KEY, time.time())
 _gold_ctx = {
     'expected': None,          # подсказка для неоднозначных состояний
     'swipe_count': 0,
@@ -23,8 +25,8 @@ _gold_ctx = {
     'stuck_last_action': None,
     'events_clicked_at': None,
     'moveon_clicked_at': None,
-    'recall_requested': False,
-    'started_at': None,
+    'recall_requested': _saved_state.get(RECALL_REQUESTED_KEY, False),
+    'started_at': _saved_state.get(STARTED_AT_KEY, None),
     'current_mining_level': None,
     'need_level_check': False,
     'main_screen_tries': 0,
@@ -32,6 +34,8 @@ _gold_ctx = {
     'find_started_at': None,
     'exit_attempts': 0,
 }
+gold_first_run = True         # при первом запуске сразу идём в золото после heal/raid, не ждём GOLD_INTERVAL
+
 
 
 # ==========================================
@@ -67,26 +71,30 @@ def gold_mission_active():
     """Отряд отправлен добывать золото и ещё не отозван."""
     return _gold_ctx.get('started_at') is not None and not _gold_ctx['recall_requested']
 
-
-def gold_mission_should_recall():
-    """Пора отозвать отряд (45 минут прошли)."""
-    recall_status, _ = _check_recall_needed()
-    return recall_status == 'recall'
+def update_gold_time():
+    """Обновить время последнего посещения рудника и сохранить в файл."""
+    global last_gold_time
+    last_gold_time = time.time()
+    update_state(**{LAST_GOLD_TIME_KEY: last_gold_time})
+    logger.info(f"[GOLD] Время обновлено: {time.ctime(last_gold_time)}")
 
 
 def start_gold_mission():
-    """Зафиксировать запуск добычи на целевом уровне."""
-    _gold_ctx['started_at'] = time.time()
+    """Зафиксировать запуск добычи на целевом уровне и сохранить таймер."""
+    now = time.time()
+    _gold_ctx['started_at'] = now
     _gold_ctx['current_mining_level'] = GOLD_LEVEL
     _gold_ctx['recall_requested'] = False
+    update_state(**{STARTED_AT_KEY: now, RECALL_REQUESTED_KEY: False})
     logger.info(f"[GOLD] Отряд отправлен на уровень {GOLD_LEVEL} в {time.ctime()}")
 
 
 def clear_gold_mission():
-    """Сбросить данные активной добычи."""
+    """Сбросить данные активной добычи и сохранить в файл."""
     _gold_ctx['started_at'] = None
     _gold_ctx['current_mining_level'] = None
     _gold_ctx['recall_requested'] = False
+    update_state(**{STARTED_AT_KEY: None, RECALL_REQUESTED_KEY: False})
 
 
 def reset_gold_context():
@@ -98,7 +106,7 @@ def reset_gold_context():
     _gold_ctx['stuck_last_action'] = None
     _gold_ctx['events_clicked_at'] = None
     _gold_ctx['moveon_clicked_at'] = None
-    _gold_ctx['recall_requested'] = False
+    # recall_requested и started_at не сбрасываем — они хранятся в файле состояния
     _gold_ctx['need_level_check'] = False
     _gold_ctx['main_screen_tries'] = 0
     _gold_ctx['raid_icon_clicks'] = 0
@@ -228,6 +236,7 @@ def _check_recall_needed():
         if elapsed >= GOLD_MINING_DURATION:
             logger.info(f"[GOLD] Добыча идёт {int(elapsed)} сек, порог {GOLD_MINING_DURATION} сек. Нужен отзыв.")
             _gold_ctx['recall_requested'] = True
+            update_state(**{RECALL_REQUESTED_KEY: True})
             return 'recall', int(elapsed)
         return 'active', int(elapsed)
 
@@ -236,11 +245,13 @@ def _check_recall_needed():
     if elapsed_since_last_gold >= GOLD_MINING_DURATION:
         logger.info(f"[GOLD] started_at утерян, но с последнего золота прошло {int(elapsed_since_last_gold)} сек. Нужен отзыв.")
         _gold_ctx['recall_requested'] = True
+        update_state(**{RECALL_REQUESTED_KEY: True})
         return 'recall', int(elapsed_since_last_gold)
 
     # Синхронизируем таймер, но не обновляем last_gold_time,
     # чтобы следующая проверка recall не зациклилась на "только что синхронизировано".
     _gold_ctx['started_at'] = now
+    update_state(**{STARTED_AT_KEY: now})
     remaining = int(GOLD_MINING_DURATION - elapsed_since_last_gold)
     logger.info(f"[GOLD] Активная добыча без известного старта. Синхронизация таймера. До recall по last_gold_time: {remaining} сек.")
     return 'sync', remaining

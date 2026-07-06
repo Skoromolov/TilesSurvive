@@ -207,6 +207,9 @@ tempCodeRunnerFile.py
 debug_screenshots/
 logs/*.log
 
+# Bot persistent state
+data/bot_state.json
+
 # Ruff stuff:
 .ruff_cache/
 
