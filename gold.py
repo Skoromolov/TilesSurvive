@@ -939,8 +939,9 @@ def process_gold(screen_cv, region, last_gold_state, window):
         else:
             logger.info("[GOLD] Добыча активна, таймер синхронизирован.")
 
-        # НЕ обновляем last_gold_time здесь: отряд добывает уже некоторое время,
-        # и сброс таймера заставил бы бота пытаться отозвать раньше, чем игра разрешает.
+        # Обновляем last_gold_time, чтобы should_do_gold() не лез в золото раньше
+        # следующего GOLD_INTERVAL. Отзыв всё равно контролируется started_at.
+        update_gold_time()
         return GoldState.COMPLETED
 
     # ---- RUDNIK TAB (выбор / поиск уровня) ----

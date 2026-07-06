@@ -204,7 +204,7 @@ def find_and_click(template_path, screen_cv, region, threshold=CONFIDENCE_THRESH
 
     if coords:
         if conf >= threshold:
-            logger.info(f"[find_and_click] ✓ найден: {template_path} (conf={conf:.3f}, coords={coords})")
+            logger.debug(f"[find_and_click] ✓ найден: {template_path} (conf={conf:.3f}, coords={coords})")
             try:
                 pyautogui.click(coords[0], coords[1])
             except pyautogui.FailSafeException:
