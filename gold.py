@@ -1025,9 +1025,11 @@ def process_gold(screen_cv, region, last_gold_state, window):
         else:
             logger.info("[GOLD] Добыча активна, таймер синхронизирован.")
 
-        # Обновляем last_gold_time, чтобы should_do_gold() не лез в золото раньше
-        # следующего GOLD_INTERVAL. Отзыв всё равно контролируется started_at.
-        update_gold_time()
+        # Обновляем last_gold_time только если недавно запустили добычу.
+        # При обычной проверке активной добычи не трогаем таймер, иначе
+        # should_do_gold() постоянно сбрасывается и бот не перезапускает добычу.
+        if _gold_ctx.get('started_at') is None:
+            update_gold_time()
         return GoldState.COMPLETED
 
     # ---- RUDNIK TAB (выбор / поиск уровня) ----

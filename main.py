@@ -11,7 +11,13 @@ sys.dont_write_bytecode = True  # отключить кеширование .pyc
 
 import time
 import os
+import shutil
 import win32gui
+
+# Удаляем stale __pycache__, иначе старые .pyc подгружаются даже с dont_write_bytecode
+if os.path.isdir('__pycache__'):
+    shutil.rmtree('__pycache__', ignore_errors=True)
+
 import pyautogui
 
 from config import *
