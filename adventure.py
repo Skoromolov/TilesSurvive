@@ -70,7 +70,8 @@ def process_adventure_state(screen_cv, region, last_adventure_state, window, cur
             return AdventureState.UNKNOWN
 
         screen_cv = take_screenshot(window, region)
-        find_and_click(ADVENTURE_GET_BIG_BUTTON_IMG, screen_cv, region, CONFIDENCE_MEDIUM_THRESHOLD)
+        # get_big_button.png matches at ~0.60 on the current UI, below CONFIDENCE_MEDIUM_THRESHOLD (0.80)
+        find_and_click(ADVENTURE_GET_BIG_BUTTON_IMG, screen_cv, region, threshold=0.55)
 
         if window is None:
             return None
@@ -78,7 +79,7 @@ def process_adventure_state(screen_cv, region, last_adventure_state, window, cur
         screen_after = take_screenshot(window, region)
 
         # После сбора награды проверяем, есть ли еще get_big_button.png
-        get_coords, _ = find_on_screen(get_template(ADVENTURE_GET_BIG_BUTTON_IMG), screen_after, region, CONFIDENCE_MEDIUM_THRESHOLD)
+        get_coords, _ = find_on_screen(get_template(ADVENTURE_GET_BIG_BUTTON_IMG), screen_after, region, threshold=0.55)
         if get_coords:
             logger.info("[ADVENTURE] Еще есть награды, продолжаем сбор.")
             return AdventureState.BAGGAGE_POPUP
@@ -92,13 +93,14 @@ def process_adventure_state(screen_cv, region, last_adventure_state, window, cur
     if current_state == AdventureState.ADVENTURE_CONFIRM:
         logger.info("[ADVENTURE] Подтверждаем награду приключения.")
         _adventure_get_attempts = 0
-        find_and_click(ADVENTURE_GET_BIG_BUTTON_IMG, screen_cv, region, CONFIDENCE_MEDIUM_THRESHOLD)
+        # get_big_button.png matches at ~0.60 on the current UI, below CONFIDENCE_MEDIUM_THRESHOLD (0.80)
+        find_and_click(ADVENTURE_GET_BIG_BUTTON_IMG, screen_cv, region, threshold=0.55)
         if window is None:
             return None
         time.sleep(1)
         screen_after = take_screenshot(window, region)
         # После подтверждения проверяем, есть ли еще get_big_button.png
-        get_coords, _ = find_on_screen(get_template(ADVENTURE_GET_BIG_BUTTON_IMG), screen_after, region, CONFIDENCE_MEDIUM_THRESHOLD)
+        get_coords, _ = find_on_screen(get_template(ADVENTURE_GET_BIG_BUTTON_IMG), screen_after, region, threshold=0.55)
         if get_coords:
             return AdventureState.BAGGAGE_POPUP
         # Выходим в поселение
