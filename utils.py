@@ -358,15 +358,21 @@ def ensure_exit_to_main_screen(window, region, max_attempts=10):
             return True
 
         # На экранах активной добычи/рейда — специальная кнопка "в поселение" (голубая стрелка слева внизу)
-        exit_coords, exit_conf = find_and_click(EXIT_TO_VILLAGE_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
-        if exit_coords:
+        exit_clicked, exit_coords = find_and_click(EXIT_TO_VILLAGE_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        if exit_clicked:
+            exit_conf = 0.0
+            if exit_coords:
+                _, exit_conf = find_on_screen(get_template(EXIT_TO_VILLAGE_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
             logger.info(f"[EXIT] Попытка {attempt}/{max_attempts}: нажимаем 'в поселение' (conf={exit_conf:.3f})")
             time.sleep(1.0)
             continue
 
         # На карте мира — нажимаем кнопку "в поселение" (иконка с мячом)
-        village_coords, village_conf = find_and_click(VILLAGE_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
-        if village_coords:
+        village_clicked, village_coords = find_and_click(VILLAGE_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        if village_clicked:
+            village_conf = 0.0
+            if village_coords:
+                _, village_conf = find_on_screen(get_template(VILLAGE_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
             logger.info(f"[EXIT] Попытка {attempt}/{max_attempts}: нажимаем кнопку 'в поселение' (conf={village_conf:.3f})")
             time.sleep(1.0)
             continue
