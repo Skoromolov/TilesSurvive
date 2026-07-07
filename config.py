@@ -68,6 +68,7 @@ CALENDAR_IMG = FOLDER + FOLDER_COMMON + 'calendar.png'
 CALENDAR_OPENED_IMG = FOLDER + FOLDER_COMMON + 'calendar_opened.png'
 EVENT_GOLD_IMG = FOLDER + FOLDER_COMMON + 'event_gold.png'
 BOOK_IMG = FOLDER + FOLDER_COMMON + 'book.png'
+EXIT_TO_VILLAGE_IMG = FOLDER + FOLDER_COMMON + 'exit_to_village.png'
 
 GOLD_CLOSE_IMG = FOLDER + FOLDER_GOLD + 'close.png'  # кнопка закрытия попапов внутри золотодобычи
 

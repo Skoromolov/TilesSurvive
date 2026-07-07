@@ -326,7 +326,9 @@ def _is_at_main_screen_village(screen_cv, region):
     if village_coords:
         return False
 
-    # Settlement markers
+    # Settlement markers — требуем хотя бы один явный признак поселения.
+    # WILD_EARTH нельзя использовать как fallback, потому что фон диких земель
+    # виден и на экране активной золотодобычи/рейда.
     settlement_markers = [
         (SOUZ_IMG, CONFIDENCE_MEDIUM_THRESHOLD),
         (HEAL_TOWN_IMG, CONFIDENCE_MEDIUM_THRESHOLD),
@@ -338,11 +340,6 @@ def _is_at_main_screen_village(screen_cv, region):
         coords, _ = find_on_screen(get_template(img), screen_cv, region, threshold=threshold)
         if coords:
             return True
-
-    # WILD_EARTH без кнопки village — возможно поселение (fallback)
-    wild_coords, _ = find_on_screen(get_template(WILD_EARTH_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
-    if wild_coords:
-        return True
 
     return False
 
@@ -360,7 +357,14 @@ def ensure_exit_to_main_screen(window, region, max_attempts=10):
             logger.info("[EXIT] Подтверждён выход в окно поселения.")
             return True
 
-        # На карте мира — нажимаем кнопку "в поселение"
+        # На экранах активной добычи/рейда — специальная кнопка "в поселение" (голубая стрелка слева внизу)
+        exit_coords, exit_conf = find_and_click(EXIT_TO_VILLAGE_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        if exit_coords:
+            logger.info(f"[EXIT] Попытка {attempt}/{max_attempts}: нажимаем 'в поселение' (conf={exit_conf:.3f})")
+            time.sleep(1.0)
+            continue
+
+        # На карте мира — нажимаем кнопку "в поселение" (иконка с мячом)
         village_coords, village_conf = find_and_click(VILLAGE_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
         if village_coords:
             logger.info(f"[EXIT] Попытка {attempt}/{max_attempts}: нажимаем кнопку 'в поселение' (conf={village_conf:.3f})")
