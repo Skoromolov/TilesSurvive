@@ -167,6 +167,14 @@ def main():
                     gold_start_time = time.time()
                     continue
 
+                # 6a. Активная золотодобыча без необходимости отзыва — не лезем в HEAL,
+                # а возвращаемся в поселение и ждём
+                if GOLD_ENABLED and gold_mission_active() and not gold_mission_should_recall():
+                    logger.info("[MAIN] Активная золотодобыча, отзыв пока не нужен. Возврат в поселение и ожидание.")
+                    _return_to_main_screen(window, region, "gold active")
+                    time.sleep(5)
+                    continue
+
                 # 7. Иначе — лечение как дефолтная активность
                 logger.debug("[MAIN] Переключение в режим HEAL (дефолт)")
                 current_mode = MainMode.HEAL

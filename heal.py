@@ -17,15 +17,39 @@ def determine_heal_state(screen_cv, region):
     """
     # Сначала проверяем главный экран поселения — высший приоритет,
     # чтобы не уходить в UNKNOWN, когда мы уже дома.
+    # Требуем хотя бы два независимых индикатора, потому что wild_earth
+    # и village false-match на фоне экрана активной золотодобычи.
+    main_indicators = 0
     coords, wild_conf = find_on_screen(get_template(WILD_EARTH_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if coords:
-        logger.debug(f"[determine_heal_state] WILD_EARTH_IMG найден (conf={wild_conf:.3f}) -> MAIN_SCREEN")
-        return HealState.MAIN_SCREEN
+        logger.debug(f"[determine_heal_state] WILD_EARTH_IMG найден (conf={wild_conf:.3f})")
+        main_indicators += 1
 
     coords, village_conf = find_on_screen(get_template(VILLAGE_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if coords:
-        logger.debug(f"[determine_heal_state] VILLAGE_IMG найден (conf={village_conf:.3f}) -> MAIN_SCREEN")
+        logger.debug(f"[determine_heal_state] VILLAGE_IMG найден (conf={village_conf:.3f})")
+        main_indicators += 1
+
+    coords, _ = find_on_screen(get_template(HEAL_TOWN_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+    if coords:
+        logger.debug("[determine_heal_state] HEAL_TOWN_IMG найден")
+        main_indicators += 1
+
+    coords, _ = find_on_screen(get_template(SOUZ_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+    if coords:
+        logger.debug("[determine_heal_state] SOUZ_IMG найден")
+        main_indicators += 1
+
+    coords, _ = find_on_screen(get_template(MAIL_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+    if coords:
+        logger.debug("[determine_heal_state] MAIL_IMG найден")
+        main_indicators += 1
+
+    if main_indicators >= 2:
+        logger.debug("[determine_heal_state] Два+ индикатора главного экрана найдены -> MAIN_SCREEN")
         return HealState.MAIN_SCREEN
+    elif main_indicators == 1:
+        logger.debug(f"[determine_heal_state] Только {main_indicators} индикатор главного экрана — возможно фон шахты/рейда, не MAIN_SCREEN")
 
     coords, _ = find_on_screen(get_template(AMBULANCE_ON_MAP_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if coords:
