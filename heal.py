@@ -134,7 +134,7 @@ def process_heal(screen_cv, region, last_heal_state, window=None):
         logger.info("[HEAL] ✓ MAIL нажато!")
         time.sleep(1)
         screen_cv = take_screenshot(window, region)
-        find_and_click(CONFIRM_BUTTON_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)
+        find_and_click(CONFIRM_BUTTON_IMG, screen_cv, region, threshold=0.50)
         return None
 
     if current_state == HealState.HEAL_ICON:
@@ -147,11 +147,11 @@ def process_heal(screen_cv, region, last_heal_state, window=None):
                 return HealState.HEAL_MENU_OPEN
             screen_new = take_screenshot(window, region)
             # Ищем кнопки с пониженным порогом, т.к. кнопка может быть частично перекрыта
-            found_free, _ = find_and_click(HEAL_FREE_BUTTON_IMG, screen_new, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
+            found_free, _ = find_and_click(HEAL_FREE_BUTTON_IMG, screen_new, region, threshold=0.35)
             if found_free:
                 logger.info("[HEAL] ✓ Бесплатное лечение нажато!")
                 return HealState.MAIN_SCREEN
-            found_heal, _ = find_and_click(HEAL_BUTTON_IMG, screen_new, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
+            found_heal, _ = find_and_click(HEAL_BUTTON_IMG, screen_new, region, threshold=0.35)
             if found_heal:
                 logger.info("[HEAL] ✓ Обычное лечение нажато!")
                 return HealState.MAIN_SCREEN
@@ -183,13 +183,13 @@ def process_heal(screen_cv, region, last_heal_state, window=None):
         logger.info(f"[HEAL] Меню лечения открыто (попытка {_heal_menu_open_attempts}/{_MAX_HEAL_MENU_ATTEMPTS}).")
 
         # Пытаемся найти и нажать кнопку бесплатного лечения, если доступна
-        found, _ = find_and_click(HEAL_FREE_BUTTON_IMG, screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
+        found, _ = find_and_click(HEAL_FREE_BUTTON_IMG, screen_cv, region, threshold=0.35)
         if found:
             logger.info("[HEAL] ✓ Бесплатное лечение нажато!")
             _heal_menu_open_attempts = 0
             return HealState.MAIN_SCREEN
         # Если бесплатное лечение недоступно, используем обычное лечение
-        found, _ = find_and_click(HEAL_BUTTON_IMG, screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
+        found, _ = find_and_click(HEAL_BUTTON_IMG, screen_cv, region, threshold=0.35)
         if found:
             logger.info("[HEAL] ✓ Обычное лечение нажато!")
             _heal_menu_open_attempts = 0
