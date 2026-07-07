@@ -103,24 +103,6 @@ def process_heal(screen_cv, region, last_heal_state, window=None):
 
     if current_state == HealState.MAIN_SCREEN:
         _heal_menu_open_attempts = 0
-        # На главном экране ищем активные элементы для лечения/сбора/помощи
-        # Если ничего не найдено — режим HEAL завершён
-        found_action = False
-        for img, name, threshold in [
-            (HEAL_TOWN_IMG, "heal_town", 0.50),
-            (HEAL_HELP_HANDS_IMG, "heal_help_hands", 0.45),
-            (HELP_HANDS_IMG, "help_hands", 0.45),
-            (BOOK_IMG, "book", 0.45),
-            (MAIL_IMG, "mail", 0.45),
-        ]:
-            found, _ = find_and_click(img, screen_cv, region, threshold=threshold)
-            if found:
-                logger.info(f"[HEAL] На главном экране нажато: {name}")
-                found_action = True
-                break
-        if not found_action:
-            logger.debug("[HEAL] На главном экране нет активных элементов для лечения. Завершаем режим.")
-            return HealState.COMPLETED
         return HealState.MAIN_SCREEN
 
     if current_state == HealState.BOOK:
@@ -134,7 +116,7 @@ def process_heal(screen_cv, region, last_heal_state, window=None):
         logger.info("[HEAL] ✓ MAIL нажато!")
         time.sleep(1)
         screen_cv = take_screenshot(window, region)
-        find_and_click(CONFIRM_BUTTON_IMG, screen_cv, region, threshold=0.50)
+        find_and_click(CONFIRM_BUTTON_IMG, screen_cv, region, CONFIDENCE_THRESHOLD)
         return None
 
     if current_state == HealState.HEAL_ICON:
@@ -147,11 +129,11 @@ def process_heal(screen_cv, region, last_heal_state, window=None):
                 return HealState.HEAL_MENU_OPEN
             screen_new = take_screenshot(window, region)
             # Ищем кнопки с пониженным порогом, т.к. кнопка может быть частично перекрыта
-            found_free, _ = find_and_click(HEAL_FREE_BUTTON_IMG, screen_new, region, threshold=0.35)
+            found_free, _ = find_and_click(HEAL_FREE_BUTTON_IMG, screen_new, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
             if found_free:
                 logger.info("[HEAL] ✓ Бесплатное лечение нажато!")
                 return HealState.MAIN_SCREEN
-            found_heal, _ = find_and_click(HEAL_BUTTON_IMG, screen_new, region, threshold=0.35)
+            found_heal, _ = find_and_click(HEAL_BUTTON_IMG, screen_new, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
             if found_heal:
                 logger.info("[HEAL] ✓ Обычное лечение нажато!")
                 return HealState.MAIN_SCREEN
@@ -183,35 +165,17 @@ def process_heal(screen_cv, region, last_heal_state, window=None):
         logger.info(f"[HEAL] Меню лечения открыто (попытка {_heal_menu_open_attempts}/{_MAX_HEAL_MENU_ATTEMPTS}).")
 
         # Пытаемся найти и нажать кнопку бесплатного лечения, если доступна
-        found, _ = find_and_click(HEAL_FREE_BUTTON_IMG, screen_cv, region, threshold=0.35)
+        found, _ = find_and_click(HEAL_FREE_BUTTON_IMG, screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
         if found:
             logger.info("[HEAL] ✓ Бесплатное лечение нажато!")
             _heal_menu_open_attempts = 0
-            # Ждём, пока кнопка исчезнет с экрана, иначе determine_heal_state снова вернёт HEAL_MENU_OPEN
-            for _ in range(5):
-                time.sleep(0.2)
-                screen_new = take_screenshot(window, region)
-                if screen_new is None:
-                    continue
-                still, _ = find_on_screen(get_template(HEAL_FREE_BUTTON_IMG), screen_new, region, threshold=0.35)
-                if not still:
-                    return HealState.MAIN_SCREEN
-            return HealState.HEAL_MENU_OPEN
+            return HealState.MAIN_SCREEN
         # Если бесплатное лечение недоступно, используем обычное лечение
-        found, _ = find_and_click(HEAL_BUTTON_IMG, screen_cv, region, threshold=0.35)
+        found, _ = find_and_click(HEAL_BUTTON_IMG, screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
         if found:
             logger.info("[HEAL] ✓ Обычное лечение нажато!")
             _heal_menu_open_attempts = 0
-            # Ждём, пока кнопка исчезнет с экрана
-            for _ in range(5):
-                time.sleep(0.2)
-                screen_new = take_screenshot(window, region)
-                if screen_new is None:
-                    continue
-                still, _ = find_on_screen(get_template(HEAL_BUTTON_IMG), screen_new, region, threshold=0.35)
-                if not still:
-                    return HealState.MAIN_SCREEN
-            return HealState.HEAL_MENU_OPEN
+            return HealState.MAIN_SCREEN
 
         # Если кнопки не найдены, но попыток ещё мало — даём анимации/загрузке время
         if _heal_menu_open_attempts < _MAX_HEAL_MENU_ATTEMPTS:

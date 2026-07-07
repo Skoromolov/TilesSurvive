@@ -196,11 +196,11 @@ def determine_raid_state(screen_cv, region):
     if coords:
         return RaidState.RECONNECT_REPEAT_POPUP
 
-    coords, _ = find_on_screen(get_template(RAID_FULL_IMG), screen_cv, region)
+    coords, _ = find_on_screen(get_template(RAID_FULL_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if coords:
         return RaidState.RAID_FULL
 
-    coords, _ = find_on_screen(get_template(RAID_NO_FREE_SPACE_IMG), screen_cv, region)
+    coords, _ = find_on_screen(get_template(RAID_NO_FREE_SPACE_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if coords:
         return RaidState.NO_FREE_SPACE
 
@@ -280,23 +280,37 @@ def process_raid(screen_cv, region, last_raid_state, last_join_time, raid_joined
 
     if current_state == RaidState.NO_FREE_SPACE:
         logger.info("[RAID] Диалог 'нет свободных мест'. Пытаемся закрыть.")
-        # Понижаем порог, т.к. кнопка закрытия может быть частично перекрыта
-        clicked, coords = find_and_click(RAID_OK_IMG, screen_cv, region, threshold=0.55)
+        # Сначала пробуем нажать OK
+        clicked, coords = find_and_click(RAID_OK_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
         if clicked:
             logger.info(f"[RAID] Нажата OK (coords={coords})")
             return RaidState.RAID_WINDOW_ACTIVE, time.time(), raid_joined_at_least_once
-        clicked, coords = find_and_click(CLOSE_IMG, screen_cv, region, threshold=0.55)
+        # Фолбэк: кнопка закрытия попапа
+        clicked, coords = find_and_click(CLOSE_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
         if clicked:
             logger.info(f"[RAID] Нажат CLOSE (coords={coords})")
             return RaidState.RAID_WINDOW_ACTIVE, time.time(), raid_joined_at_least_once
-        # Фолбэк: back и остаёмся в режиме
+        # Последний фолбэк: back.png
         logger.warning("[RAID] Не удалось закрыть диалог no_free_space, пробуем BACK")
         find_and_click(BACK_IMG, screen_cv, region)
         return RaidState.RAID_WINDOW_ACTIVE, time.time(), raid_joined_at_least_once
 
     if current_state == RaidState.RAID_FULL:
-        find_and_click(RAID_OK_IMG, screen_cv, region)
-        return RaidState.RAID_COMPLETED, time.time(), raid_joined_at_least_once
+        logger.info("[RAID] Диалог 'все ячейки рейда заполнены'. Пытаемся закрыть.")
+        clicked, coords = find_and_click(RAID_OK_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        if clicked:
+            logger.info(f"[RAID] Нажата OK (coords={coords})")
+            # Ждём закрытия попапа; если не закрылся — следующая итерация обработает снова
+            time.sleep(0.5)
+            return RaidState.RAID_WINDOW_ACTIVE, time.time(), raid_joined_at_least_once
+        clicked, coords = find_and_click(CLOSE_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        if clicked:
+            logger.info(f"[RAID] Нажат CLOSE (coords={coords})")
+            time.sleep(0.5)
+            return RaidState.RAID_WINDOW_ACTIVE, time.time(), raid_joined_at_least_once
+        logger.warning("[RAID] Не удалось закрыть диалог raid_full, пробуем BACK")
+        find_and_click(BACK_IMG, screen_cv, region)
+        return RaidState.RAID_WINDOW_ACTIVE, time.time(), raid_joined_at_least_once
 
     # if current_state == RaidState.NO_REIDS:
     #     village_coords, _ = find_on_screen(get_template(VILLAGE_IMG), screen_cv, region)
@@ -321,11 +335,13 @@ def process_raid(screen_cv, region, last_raid_state, last_join_time, raid_joined
             if found2:
                 time.sleep(0.3)
                 screen_cv = take_screenshot(window, region)
-                no_space_found, _ = find_and_click(RAID_NO_FREE_SPACE_IMG, screen_cv, region)
+                no_space_found, _ = find_and_click(RAID_NO_FREE_SPACE_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
                 screen_cv = take_screenshot(window, region)
-                ok_found, _ =  find_and_click(RAID_OK_IMG, screen_cv, region)
-                if no_space_found:
-                    return RaidState.NO_FREE_SPACE, time.time(), True
+                full_found, _ = find_and_click(RAID_FULL_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+                screen_cv = take_screenshot(window, region)
+                ok_found, _ = find_and_click(RAID_OK_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+                if no_space_found or full_found:
+                    return RaidState.RAID_WINDOW_ACTIVE, time.time(), True
                 if ok_found:
                     return RaidState.RAID_IN_PROGRESS, time.time(), True
             return RaidState.RAID_IN_PROGRESS, time.time(), True
