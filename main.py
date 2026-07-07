@@ -170,7 +170,7 @@ def main():
                 # 6a. Активная золотодобыча без необходимости отзыва — не блокируем HEAL/сбор.
                 # Просто убеждаемся, что бот в поселении, и даём main loop продолжить нормальный цикл.
                 if GOLD_ENABLED and gold_mission_active() and not gold_mission_should_recall():
-                    if not _is_at_main_screen_village(screen_cv, region):
+                    if not is_at_main_screen_village(screen_cv, region):
                         logger.info("[MAIN] Активная золотодобыча: выходим в поселение, но не прерываем сбор/лечение.")
                         _return_to_main_screen(window, region, "gold active")
                     else:

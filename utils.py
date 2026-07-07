@@ -315,7 +315,7 @@ def scroll_in_region(region, direction="down", duration=0.3, step_ratio=0.3):
     logger.info(f"[SCROLL] {direction}: ({cx},{y1}) -> ({cx},{y2})")
 
 
-def _is_at_main_screen_village(screen_cv, region):
+def is_at_main_screen_village(screen_cv, region):
     """
     Проверить, что мы находимся в окне поселения.
     В диких землях (wild lands) виден WILD_EARTH_IMG и кнопка VILLAGE_IMG ("в поселение").
@@ -353,7 +353,7 @@ def ensure_exit_to_main_screen(window, region, max_attempts=10):
     """
     for attempt in range(1, max_attempts + 1):
         screen_cv = take_screenshot(window, region)
-        if _is_at_main_screen_village(screen_cv, region):
+        if is_at_main_screen_village(screen_cv, region):
             logger.info("[EXIT] Подтверждён выход в окно поселения.")
             return True
 
@@ -382,7 +382,7 @@ def ensure_exit_to_main_screen(window, region, max_attempts=10):
         find_and_click(BACK_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
         time.sleep(1.0)
         screen_cv = take_screenshot(window, region)
-        if _is_at_main_screen_village(screen_cv, region):
+        if is_at_main_screen_village(screen_cv, region):
             return True
 
         logger.info(f"[EXIT] Попытка выхода {attempt}/{max_attempts}: нажимаем close.png")
