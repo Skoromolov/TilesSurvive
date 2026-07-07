@@ -115,7 +115,8 @@ def determine_adventure_state(screen_cv, region):
     Returns: AdventureState.ADVENTURE, AdventureState.ADVENTURE_PAGE, AdventureState.BAGGAGE_POPUP, AdventureState.ADVENTURE_GET, AdventureState.ADVENTURE_CONFIRM, or AdventureState.UNKNOWN
     """
     # Check for adventure button (enter adventure)
-    coords, _ = find_on_screen(get_template(ADVENTURE_IMG), screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
+    # confidence on main screen is ~0.73, below CONFIDENCE_MEDIUM_THRESHOLD (0.80)
+    coords, _ = find_on_screen(get_template(ADVENTURE_IMG), screen_cv, region, threshold=0.65)
     if coords:
         return AdventureState.ADVENTURE
     # Check for adventure page (after clicking adventure)

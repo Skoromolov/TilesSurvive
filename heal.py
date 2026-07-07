@@ -119,7 +119,7 @@ def process_heal(screen_cv, region, last_heal_state, window=None):
                 found_action = True
                 break
         if not found_action:
-            logger.info("[HEAL] На главном экране нет активных элементов для лечения. Завершаем режим.")
+            logger.debug("[HEAL] На главном экране нет активных элементов для лечения. Завершаем режим.")
             return HealState.COMPLETED
         return HealState.MAIN_SCREEN
 
