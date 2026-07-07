@@ -181,8 +181,10 @@ def _click_and_check_completion(button_img, log_msg, window, screen_cv, region, 
     if not clicked:
         return 'other', screen_cv
 
+    effective_delay = post_click_delay if post_click_delay is not None else GOLD_ACTION_DELAY
+
     for attempt in range(1, max_attempts + 1):
-        screen_after = _take_result_screenshot(window, region, delay=post_click_delay)
+        screen_after = _take_result_screenshot(window, region, delay=effective_delay)
         if screen_after is None:
             continue
         result, _ = _check_mining_result(screen_after, region)
@@ -192,11 +194,10 @@ def _click_and_check_completion(button_img, log_msg, window, screen_cv, region, 
             return 'go', None
         if result == 'summary':
             return 'summary', None
-        # Если остаточный summary text — запоминаем, чтобы вернуть 'wait' вместо 'other'
         if result == 'wait':
             if attempt == max_attempts:
                 return 'wait', screen_after
-            logger.debug(f"[GOLD] Попытка {attempt}: остаточный текст 'Общая сила', ждём ещё.")
+            logger.debug(f"[GOLD] Попытка {attempt}: анимация отправки, ждём ещё.")
             continue
         if attempt < max_attempts:
             logger.debug(f"[GOLD] Попытка {attempt}: результат не определён, ждём ещё.")
@@ -792,8 +793,8 @@ def process_gold(screen_cv, region, last_gold_state, window):
                 GOLD_GO_IMG,
                 "[GOLD] Нажимаем 'Марш' для отправки отряда.",
                 window, screen_cv, region,
-                post_click_delay=0.5,
-                max_attempts=2
+                post_click_delay=1.5,
+                max_attempts=5
             )
             if result == 'completed':
                 return _complete_mission("[GOLD] ✓ Золотодобыча запущена через 'Марш'!")
@@ -809,8 +810,8 @@ def process_gold(screen_cv, region, last_gold_state, window):
                 GOLD_WORK_IMG,
                 "[GOLD] Нажимаем 'Добывать' для отправки отряда.",
                 window, screen_cv, region,
-                post_click_delay=0.2,
-                max_attempts=1
+                post_click_delay=0.5,
+                max_attempts=2
             )
             if result == 'completed':
                 return _complete_mission("[GOLD] ✓ Золотодобыча запущена!")
@@ -838,7 +839,18 @@ def process_gold(screen_cv, region, last_gold_state, window):
             logger.info("[GOLD] После 'Добывать' окно 'Общая сила' закрылось. Переопределяем состояние.")
             return GoldState.UNKNOWN
 
-        logger.info("[GOLD] В окне 'Общая сила' нет кнопки 'Добывать'/'Марш'. Закрываем попап.")
+        logger.info("[GOLD] В окне 'Общая сила' нет кнопки 'Добывать'/'Марш'. Подождём анимацию перед закрытием.")
+        # Даём до 2 секунд: GO-окно иногда появляется с задержкой после summary.
+        for _ in range(4):
+            time.sleep(0.5)
+            screen_cv = take_screenshot(window, region)
+            if screen_cv is None:
+                continue
+            go_coords, _ = find_on_screen(get_template(GOLD_GO_IMG), screen_cv, region)
+            work_coords, _ = find_on_screen(get_template(GOLD_WORK_IMG), screen_cv, region)
+            if go_coords or work_coords:
+                logger.info("[GOLD] Появилась кнопка 'Добывать'/'Марш' — обработаем окно.")
+                return GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE
         return _close_to_rudkin_tab(screen_cv, region, window)
 
     # ---- GO / WORK / GRIND ----
@@ -847,8 +859,8 @@ def process_gold(screen_cv, region, last_gold_state, window):
             GOLD_GO_IMG,
             "[GOLD] Нажимаем 'GO' для отправки отряда.",
             window, screen_cv, region,
-            post_click_delay=0.5,
-            max_attempts=2
+            post_click_delay=1.5,
+            max_attempts=5
         )
         if result == 'completed':
             return _complete_mission("[GOLD] ✓ Золотодобыча запущена!")
@@ -857,7 +869,8 @@ def process_gold(screen_cv, region, last_gold_state, window):
             return GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE
         if result == 'wait':
             logger.info("[GOLD] После 'GO' окно 'Общая сила' ещё на экране — анимация отправки. Подождём.")
-            return GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE
+            time.sleep(1.0)
+            return GoldState.GO_VISIBLE
 
         # GO нажали, но результата нет — проверяем, не застряли ли в попапе
         screen_for_check = screen_after if screen_after is not None else screen_cv
@@ -884,40 +897,48 @@ def process_gold(screen_cv, region, last_gold_state, window):
         return GoldState.RUDNIK_TAB
 
     if current_state == GoldState.WORK_VISIBLE:
-        result, _ = _click_and_check_completion(
+        result, screen_after = _click_and_check_completion(
             GOLD_WORK_IMG,
             "[GOLD] Нажимаем 'WORK' для отправки отряда.",
             window, screen_cv, region,
-            post_click_delay=0.2,
-            max_attempts=1
+            post_click_delay=0.5,
+            max_attempts=2
         )
         if result == 'completed':
             return _complete_mission("[GOLD] ✓ Золотодобыча запущена!")
-        if result == 'summary':
-            logger.info("[GOLD] После 'WORK' открылось окно 'Общая сила'. Обработаем его.")
-            return GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE
         if result == 'go':
             logger.info("[GOLD] После 'WORK' открылось окно с 'Марш'. Обработаем его.")
-            return GoldState.GO_VISIBLE
+            return GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE
+        if result == 'summary':
+            logger.info("[GOLD] После 'WORK' окно осталось — место занято. Закрываем попап.")
+            return _close_to_rudkin_tab(screen_after, region, window)
+        if result == 'wait':
+            logger.info("[GOLD] После 'WORK' окно 'Общая сила' ещё на экране — анимация. Подождём.")
+            time.sleep(1.0)
+            return GoldState.WORK_VISIBLE
 
-        return GoldState.GO_VISIBLE
+        return GoldState.UNKNOWN
 
     if current_state == GoldState.GRIND_VISIBLE:
         result, screen_after = _click_and_check_completion(
             GOLD_GRIND_IMG,
             "[GOLD] Нажимаем 'GRIND'.",
             window, screen_cv, region,
-            post_click_delay=0.2,
-            max_attempts=1
+            post_click_delay=0.5,
+            max_attempts=2
         )
         if result == 'completed':
             return _complete_mission("[GOLD] ✓ Золотодобыча запущена!")
-        if result == 'summary':
-            logger.info("[GOLD] После 'GRIND' открылось окно 'Общая сила'.")
-            return GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE
         if result == 'go':
             logger.info("[GOLD] После 'GRIND' открылось окно с 'Марш'. Обработаем его.")
-            return GoldState.GO_VISIBLE
+            return GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE
+        if result == 'summary':
+            logger.info("[GOLD] После 'GRIND' открылось окно 'Общая сила'.")
+            return _close_to_rudkin_tab(screen_after, region, window)
+        if result == 'wait':
+            logger.info("[GOLD] После 'GRIND' окно 'Общая сила' ещё на экране — анимация. Подождём.")
+            time.sleep(1.0)
+            return GoldState.GRIND_VISIBLE
 
         screen_for_check = screen_after if screen_after is not None else screen_cv
         free_coords, _ = find_on_screen(get_template(GOLD_FREE_PLACE_IMG), screen_for_check, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
@@ -939,8 +960,8 @@ def process_gold(screen_cv, region, last_gold_state, window):
             GOLD_FREE_PLACE_IMG,
             "[GOLD] Нажимаем свободное место.",
             window, screen_cv, region,
-            post_click_delay=0.2,
-            max_attempts=1
+            post_click_delay=0.5,
+            max_attempts=2
         )
         if result == 'completed':
             return _complete_mission("[GOLD] ✓ Золотодобыча запущена!")
