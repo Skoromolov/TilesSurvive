@@ -137,8 +137,9 @@ def _check_mining_result(screen_after, region):
     Проверить результат отправки отряда на скриншоте.
     Возвращает:
         ('completed', None) — отряд отправлен (return.png / my_rudnik.png видны)
-        ('summary', None) — открылось окно 'Общая сила' с кнопкой 'Добывать'
         ('go', None)       — открылось окно отправки отряда с кнопкой 'Марш'
+        ('summary', None)  — открылось окно 'Общая сила' с кнопкой 'Добывать' (место занято)
+        ('wait', None)     — на экране ещё остаточный текст 'Общая сила', нужно подождать анимацию
         ('unknown', None)  — окно закрылось, состояние не определено
     """
     if screen_after is None:
@@ -158,12 +159,50 @@ def _check_mining_result(screen_after, region):
     if work_coords:
         return 'summary', None
 
-    # Если summary text остался, но ни work ни go не видны — значит это непонятный попап
+    # Если summary text остался, но ни work ни go не видны — значит анимация отправки ещё идёт
     summary_coords, _ = find_on_screen(get_template(GOLD_SUMMARY_STRENGTH_TEXT_IMG), screen_after, region)
     if summary_coords:
-        return 'summary', None
+        return 'wait', None
 
     return 'unknown', None
+
+
+def _click_and_check_completion(button_img, log_msg, window, screen_cv, region, post_click_delay=None, max_attempts=1):
+    """
+    Нажать кнопку отправки отряда и проверить результат.
+    Возвращает:
+        ('completed', None) — отряд отправлен
+        ('summary', None) — открылось окно 'Общая сила' (место занято)
+        ('go', None)       — открылось окно с кнопкой 'Марш'
+        ('other', screen_after) — другое состояние, нужна дальнейшая проверка
+    """
+    logger.info(log_msg)
+    clicked, _ = find_and_click(button_img, screen_cv, region)
+    if not clicked:
+        return 'other', screen_cv
+
+    for attempt in range(1, max_attempts + 1):
+        screen_after = _take_result_screenshot(window, region, delay=post_click_delay)
+        if screen_after is None:
+            continue
+        result, _ = _check_mining_result(screen_after, region)
+        if result == 'completed':
+            return 'completed', None
+        if result == 'go':
+            return 'go', None
+        if result == 'summary':
+            return 'summary', None
+        if result == 'wait':
+            # Анимация отправки ещё идёт, продолжаем ждать
+            logger.debug(f"[GOLD] Попытка {attempt}: остаточный текст 'Общая сила', ждём завершения анимации.")
+            if attempt < max_attempts:
+                continue
+            # Последняя попытка — всё ещё wait, считаем unknown
+            return 'other', screen_after
+        # 'unknown' — возможно окно уже закрылось
+        if attempt < max_attempts:
+            logger.debug(f"[GOLD] Попытка {attempt}: результат не определён, ждём ещё.")
+    return 'other', screen_after if screen_after is not None else screen_cv
 
 
 def _ensure_target_level(screen_cv, region, window=None, log_prefix="[GOLD]"):
