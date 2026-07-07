@@ -187,13 +187,31 @@ def process_heal(screen_cv, region, last_heal_state, window=None):
         if found:
             logger.info("[HEAL] ✓ Бесплатное лечение нажато!")
             _heal_menu_open_attempts = 0
-            return HealState.MAIN_SCREEN
+            # Ждём, пока кнопка исчезнет с экрана, иначе determine_heal_state снова вернёт HEAL_MENU_OPEN
+            for _ in range(5):
+                time.sleep(0.2)
+                screen_new = take_screenshot(window, region)
+                if screen_new is None:
+                    continue
+                still, _ = find_on_screen(get_template(HEAL_FREE_BUTTON_IMG), screen_new, region, threshold=0.35)
+                if not still:
+                    return HealState.MAIN_SCREEN
+            return HealState.HEAL_MENU_OPEN
         # Если бесплатное лечение недоступно, используем обычное лечение
         found, _ = find_and_click(HEAL_BUTTON_IMG, screen_cv, region, threshold=0.35)
         if found:
             logger.info("[HEAL] ✓ Обычное лечение нажато!")
             _heal_menu_open_attempts = 0
-            return HealState.MAIN_SCREEN
+            # Ждём, пока кнопка исчезнет с экрана
+            for _ in range(5):
+                time.sleep(0.2)
+                screen_new = take_screenshot(window, region)
+                if screen_new is None:
+                    continue
+                still, _ = find_on_screen(get_template(HEAL_BUTTON_IMG), screen_new, region, threshold=0.35)
+                if not still:
+                    return HealState.MAIN_SCREEN
+            return HealState.HEAL_MENU_OPEN
 
         # Если кнопки не найдены, но попыток ещё мало — даём анимации/загрузке время
         if _heal_menu_open_attempts < _MAX_HEAL_MENU_ATTEMPTS:
