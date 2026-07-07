@@ -24,13 +24,14 @@ def process_adventure_state(screen_cv, region, last_adventure_state, window, cur
     if current_state == AdventureState.ADVENTURE:
         logger.info("[ADVENTURE] Нажимаем adventure.png для входа в приключения.")
         _adventure_get_attempts = 0
-        find_and_click(ADVENTURE_IMG, screen_cv, region, CONFIDENCE_MEDIUM_THRESHOLD)
+        # Use the same low threshold as determine_adventure_state; the main-screen icon matches at ~0.73
+        find_and_click(ADVENTURE_IMG, screen_cv, region, threshold=0.65)
         if window is None:
             return None
         time.sleep(1.0)
         screen_after = take_screenshot(window, region)
         # Проверяем, что открылась страница приключений
-        page_coords, _ = find_on_screen(get_template(ADVENTURE_PAGE_IMG), screen_after, region, CONFIDENCE_MEDIUM_THRESHOLD)
+        page_coords, _ = find_on_screen(get_template(ADVENTURE_PAGE_IMG), screen_after, region, threshold=0.65)
         if page_coords:
             logger.info("[ADVENTURE] Открылась страница приключений.")
             return AdventureState.ADVENTURE_PAGE

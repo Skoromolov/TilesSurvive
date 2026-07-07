@@ -107,11 +107,11 @@ def process_heal(screen_cv, region, last_heal_state, window=None):
         # Если ничего не найдено — режим HEAL завершён
         found_action = False
         for img, name, threshold in [
-            (HEAL_TOWN_IMG, "heal_town", CONFIDENCE_THRESHOLD),
-            (HEAL_HELP_HANDS_IMG, "heal_help_hands", CONFIDENCE_THRESHOLD),
-            (HELP_HANDS_IMG, "help_hands", CONFIDENCE_THRESHOLD),
-            (BOOK_IMG, "book", CONFIDENCE_THRESHOLD),
-            (MAIL_IMG, "mail", CONFIDENCE_THRESHOLD),
+            (HEAL_TOWN_IMG, "heal_town", 0.50),
+            (HEAL_HELP_HANDS_IMG, "heal_help_hands", 0.45),
+            (HELP_HANDS_IMG, "help_hands", 0.45),
+            (BOOK_IMG, "book", 0.45),
+            (MAIL_IMG, "mail", 0.45),
         ]:
             found, _ = find_and_click(img, screen_cv, region, threshold=threshold)
             if found:
