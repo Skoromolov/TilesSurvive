@@ -123,7 +123,7 @@ def determine_adventure_state(screen_cv, region):
     if coords:
         return AdventureState.ADVENTURE
     # Check for adventure page (after clicking adventure)
-    coords, _ = find_on_screen(get_template(ADVENTURE_PAGE_IMG), screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
+    coords, _ = find_on_screen(get_template(ADVENTURE_PAGE_IMG), screen_cv, region, threshold=0.70)
     if coords:
         return AdventureState.ADVENTURE_PAGE
     # Check for baggage popup (after clicking get)
@@ -131,7 +131,7 @@ def determine_adventure_state(screen_cv, region):
     if coords:
         return AdventureState.BAGGAGE_POPUP
     # Check for big get button
-    coords, _ = find_on_screen(get_template(ADVENTURE_GET_BIG_BUTTON_IMG), screen_cv, region, threshold=0.60)
+    coords, _ = find_on_screen(get_template(ADVENTURE_GET_BIG_BUTTON_IMG), screen_cv, region, threshold=0.70)
     if coords:
         return AdventureState.ADVENTURE_CONFIRM
 
