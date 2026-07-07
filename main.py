@@ -167,13 +167,15 @@ def main():
                     gold_start_time = time.time()
                     continue
 
-                # 6a. Активная золотодобыча без необходимости отзыва — не лезем в HEAL,
-                # а возвращаемся в поселение и ждём
+                # 6a. Активная золотодобыча без необходимости отзыва — не блокируем HEAL/сбор.
+                # Просто убеждаемся, что бот в поселении, и даём main loop продолжить нормальный цикл.
                 if GOLD_ENABLED and gold_mission_active() and not gold_mission_should_recall():
-                    logger.info("[MAIN] Активная золотодобыча, отзыв пока не нужен. Возврат в поселение и ожидание.")
-                    _return_to_main_screen(window, region, "gold active")
-                    time.sleep(5)
-                    continue
+                    if not _is_at_main_screen_village(screen_cv, region):
+                        logger.info("[MAIN] Активная золотодобыча: выходим в поселение, но не прерываем сбор/лечение.")
+                        _return_to_main_screen(window, region, "gold active")
+                    else:
+                        logger.debug("[MAIN] Активная золотодобыча: уже в поселении, продолжаем обычный цикл.")
+                    # Не делаем continue — падаем в HEAL/сбор ниже.
 
                 # 7. Иначе — лечение как дефолтная активность
                 logger.debug("[MAIN] Переключение в режим HEAL (дефолт)")
