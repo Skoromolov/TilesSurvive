@@ -1085,22 +1085,49 @@ def process_gold(screen_cv, region, last_gold_state, window):
         _gold_ctx['swipe_count'] = 0
         gold_coords, gold_conf, gold_template = find_event_gold_in_calendar(screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
         if gold_coords:
-            logger.info(f"[GOLD] Нажали на событие золотодобычи ({gold_template}, conf={gold_conf:.3f}). Ждём попап 'Вперёд'.")
-            pyautogui.click(gold_coords[0], gold_coords[1])
+            # Клик по иконке event_gold.png часто не открывает попап.
+            # Кликабельная область строки — правее иконки, по тексту/карточке события.
+            # Смещаем клик вправо на ~2.5 ширины иконки и немного вниз, чтобы попасть в середину строки.
+            template = get_template(gold_template) if gold_template else None
+            icon_w = template.shape[1] if template is not None else 60
+            icon_h = template.shape[0] if template is not None else 60
+            click_x = gold_coords[0] + icon_w * 2.5
+            click_y = gold_coords[1] + icon_h * 0.2
+            logger.info(f"[GOLD] Нажимаем на строку события золотодобычи ({gold_template}, conf={gold_conf:.3f}) по ({click_x:.0f}, {click_y:.0f}).")
+            pyautogui.click(click_x, click_y)
             time.sleep(GOLD_ACTION_DELAY)
-            return GoldState.FORWARD_POPUP_VISIBLE
+            # Проверяем, открылся ли попап с кнопкой 'Вперёд', на свежем скриншоте
+            screen_after = take_screenshot(window, region)
+            if screen_after is not None:
+                forward_coords, forward_conf = find_on_screen(get_template(GOLD_FORWARD_IMG), screen_after, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
+                if forward_coords:
+                    logger.info(f"[GOLD] Попап 'Вперёд' открылся (conf={forward_conf:.3f}).")
+                    return GoldState.FORWARD_POPUP_VISIBLE
+                logger.info("[GOLD] Попап 'Вперёд' не открылся после первого клика, пробуем ещё раз.")
+                pyautogui.click(click_x, click_y)
+                time.sleep(GOLD_ACTION_DELAY)
+                screen_after2 = take_screenshot(window, region)
+                if screen_after2 is not None:
+                    forward_coords2, forward_conf2 = find_on_screen(get_template(GOLD_FORWARD_IMG), screen_after2, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
+                    if forward_coords2:
+                        logger.info(f"[GOLD] Попап 'Вперёд' открылся со второй попытки (conf={forward_conf2:.3f}).")
+                        return GoldState.FORWARD_POPUP_VISIBLE
+            logger.info("[GOLD] Не удалось открыть попап события, продолжаем искать/скроллить.")
+            return GoldState.EVENTS_NEED_SCROLL
         return GoldState.EVENTS_MENU_OPEN
 
     # ---- EVENTS: FORWARD POPUP ----
     if current_state == GoldState.FORWARD_POPUP_VISIBLE:
         _gold_ctx['expected'] = 'rudnik_tab'
-        clicked, _ = find_and_click(GOLD_FORWARD_IMG, screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
+        # Делаем свежий скриншот перед кликом, т.к. попап мог появиться после предыдущего шага
+        screen_now = take_screenshot(window, region) if window else screen_cv
+        clicked, _ = find_and_click(GOLD_FORWARD_IMG, screen_now, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
         if clicked:
             logger.info("[GOLD] Нажали 'Вперёд'. Ждём открытия табы рудника.")
             time.sleep(GOLD_ACTION_DELAY)
             return GoldState.RUDNIK_TAB
         logger.info("[GOLD] Кнопка 'Вперёд' не найдена, пробуем закрыть попап.")
-        find_and_click(GOLD_CLOSE_IMG, screen_cv, region)
+        find_and_click(GOLD_CLOSE_IMG, screen_now, region)
         return GoldState.EVENTS_MENU_OPEN
 
     # ---- EVENTS: MENU OPEN, NEED SCROLL ----
