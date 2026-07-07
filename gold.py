@@ -384,17 +384,15 @@ def is_target_level_in_list(screen_cv, region, target=GOLD_LEVEL, threshold=None
 def find_event_gold_in_calendar(screen_cv, region, threshold=CONFIDENCE_THRESHOLD):
     """Найти событие золотодобычи в календаре.
 
-    Сначала ищет event_gold.png (иконка/текст рудника). Если не найден —
-    fallback на rudnik.png, т.к. цвет фона строки в календаре меняется
-    (красный/синий/зелёный) и старый шаблон со всей строкой мог не сработать.
+    Ищет только event_gold.png — маленькую иконку в строке календаря.
+    rudnik.png НЕ используется здесь, т.к. rudnik.png — это элемент верхней
+    карусели активного события, а не строка календаря; клик по нему не
+    открывает попап "Вперёд".
     Возвращает (coords, conf, template_path) или (None, 0.0, None).
     """
     coords, conf = find_on_screen(get_template(EVENT_GOLD_IMG), screen_cv, region, threshold=threshold)
     if coords:
         return coords, conf, EVENT_GOLD_IMG
-    coords, conf = find_on_screen(get_template(GOLD_RUDNIK_IMG), screen_cv, region, threshold=threshold)
-    if coords:
-        return coords, conf, GOLD_RUDNIK_IMG
     return None, 0.0, None
 
 
@@ -590,12 +588,21 @@ def determine_gold_state(screen_cv, region):
     if coords:
         return GoldState.FORWARD_POPUP_VISIBLE
 
-    # 14. Меню событий: видна иконка золотодобычи → можно кликать
+    # 14. Активное событие открылось вместо календаря: в верхней карусели виден rudnik.png,
+    #     а calendar_opened.png не виден. Нужно кликнуть по вкладке рудника, чтобы перейти к золотодобыче.
+    rudnik_coords, _ = find_on_screen(get_template(GOLD_RUDNIK_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+    if rudnik_coords:
+        rudnik_rel_y = (rudnik_coords[1] - region[1]) / region[3] if region[3] else 1.0
+        calendar_opened_coords, _ = find_on_screen(get_template(CALENDAR_OPENED_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        if rudnik_rel_y < 0.30 and not calendar_opened_coords:
+            return GoldState.EVENTS_MENU_OPEN
+
+    # 15. Меню событий: видна иконка золотодобычи в строке календаря → можно кликать
     gold_coords, _, _ = find_event_gold_in_calendar(screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if gold_coords:
         return GoldState.EVENTS_RUDNIK_VISIBLE
 
-    # 15. Главный экран / поселение / карта — проверяем ДО back.png,
+    # 16. Главный экран / поселение / карта — проверяем ДО back.png,
     #     чтобы ложное срабатывание back.png не перебивало главный экран.
     events_coords, _ = find_on_screen(get_template(EVENTS_IMG), screen_cv, region)
     if events_coords:
@@ -1144,6 +1151,18 @@ def process_gold(screen_cv, region, last_gold_state, window):
             _gold_ctx['swipe_count'] = 0
             _gold_ctx['expected'] = 'rudnik_tab'
             return GoldState.RUDNIK_TAB
+
+        # Если events.png открыло активное событие (не календарь), в верхней карусели
+        # будет виден rudnik.png. Кликаем по нему, чтобы переключиться на вкладку рудника.
+        rudnik_coords, rudnik_conf = find_on_screen(get_template(GOLD_RUDNIK_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        if rudnik_coords:
+            rudnik_rel_y = (rudnik_coords[1] - region[1]) / region[3] if region[3] else 1.0
+            calendar_opened_coords, _ = find_on_screen(get_template(CALENDAR_OPENED_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+            if rudnik_rel_y < 0.30 and not calendar_opened_coords:
+                logger.info(f"[GOLD] Открыто активное событие, переключаемся на вкладку рудника (rudnik.png conf={rudnik_conf:.3f}).")
+                pyautogui.click(rudnik_coords[0], rudnik_coords[1])
+                time.sleep(GOLD_ACTION_DELAY)
+                return GoldState.EVENTS_MENU_OPEN
 
         # Сначала проверим, не появилась ли иконка золотодобычи после предыдущего свайпа
         gold_coords, _, _ = find_event_gold_in_calendar(screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
