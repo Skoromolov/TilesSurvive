@@ -192,14 +192,12 @@ def _click_and_check_completion(button_img, log_msg, window, screen_cv, region, 
             return 'go', None
         if result == 'summary':
             return 'summary', None
+        # Если остаточный summary text — запоминаем, чтобы вернуть 'wait' вместо 'other'
         if result == 'wait':
-            # Анимация отправки ещё идёт, продолжаем ждать
-            logger.debug(f"[GOLD] Попытка {attempt}: остаточный текст 'Общая сила', ждём завершения анимации.")
-            if attempt < max_attempts:
-                continue
-            # Последняя попытка — всё ещё wait, считаем unknown
-            return 'other', screen_after
-        # 'unknown' — возможно окно уже закрылось
+            if attempt == max_attempts:
+                return 'wait', screen_after
+            logger.debug(f"[GOLD] Попытка {attempt}: остаточный текст 'Общая сила', ждём ещё.")
+            continue
         if attempt < max_attempts:
             logger.debug(f"[GOLD] Попытка {attempt}: результат не определён, ждём ещё.")
     return 'other', screen_after if screen_after is not None else screen_cv
@@ -794,8 +792,8 @@ def process_gold(screen_cv, region, last_gold_state, window):
                 GOLD_GO_IMG,
                 "[GOLD] Нажимаем 'Марш' для отправки отряда.",
                 window, screen_cv, region,
-                post_click_delay=2.0,
-                max_attempts=3
+                post_click_delay=0.5,
+                max_attempts=2
             )
             if result == 'completed':
                 return _complete_mission("[GOLD] ✓ Золотодобыча запущена через 'Марш'!")
@@ -811,8 +809,8 @@ def process_gold(screen_cv, region, last_gold_state, window):
                 GOLD_WORK_IMG,
                 "[GOLD] Нажимаем 'Добывать' для отправки отряда.",
                 window, screen_cv, region,
-                post_click_delay=1.0,
-                max_attempts=2
+                post_click_delay=0.2,
+                max_attempts=1
             )
             if result == 'completed':
                 return _complete_mission("[GOLD] ✓ Золотодобыча запущена!")
@@ -849,13 +847,16 @@ def process_gold(screen_cv, region, last_gold_state, window):
             GOLD_GO_IMG,
             "[GOLD] Нажимаем 'GO' для отправки отряда.",
             window, screen_cv, region,
-            post_click_delay=2.0,
-            max_attempts=3
+            post_click_delay=0.5,
+            max_attempts=2
         )
         if result == 'completed':
             return _complete_mission("[GOLD] ✓ Золотодобыча запущена!")
         if result in ('summary', 'go'):
             logger.info("[GOLD] После 'GO' всё ещё открыто окно отправки/общей силы. Обработаем его.")
+            return GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE
+        if result == 'wait':
+            logger.info("[GOLD] После 'GO' окно 'Общая сила' ещё на экране — анимация отправки. Подождём.")
             return GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE
 
         # GO нажали, но результата нет — проверяем, не застряли ли в попапе
@@ -938,7 +939,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
             GOLD_FREE_PLACE_IMG,
             "[GOLD] Нажимаем свободное место.",
             window, screen_cv, region,
-            post_click_delay=1.0,
+            post_click_delay=0.2,
             max_attempts=1
         )
         if result == 'completed':
