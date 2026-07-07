@@ -755,8 +755,8 @@ def process_gold(screen_cv, region, last_gold_state, window):
                 GOLD_GO_IMG,
                 "[GOLD] Нажимаем 'Марш' для отправки отряда.",
                 window, screen_cv, region,
-                post_click_delay=0.5,
-                max_attempts=1
+                post_click_delay=2.0,
+                max_attempts=3
             )
             if result == 'completed':
                 return _complete_mission("[GOLD] ✓ Золотодобыча запущена через 'Марш'!")
@@ -772,8 +772,8 @@ def process_gold(screen_cv, region, last_gold_state, window):
                 GOLD_WORK_IMG,
                 "[GOLD] Нажимаем 'Добывать' для отправки отряда.",
                 window, screen_cv, region,
-                post_click_delay=0.2,
-                max_attempts=1
+                post_click_delay=1.0,
+                max_attempts=2
             )
             if result == 'completed':
                 return _complete_mission("[GOLD] ✓ Золотодобыча запущена!")
@@ -810,8 +810,8 @@ def process_gold(screen_cv, region, last_gold_state, window):
             GOLD_GO_IMG,
             "[GOLD] Нажимаем 'GO' для отправки отряда.",
             window, screen_cv, region,
-            post_click_delay=0.5,
-            max_attempts=1
+            post_click_delay=2.0,
+            max_attempts=3
         )
         if result == 'completed':
             return _complete_mission("[GOLD] ✓ Золотодобыча запущена!")
@@ -899,7 +899,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
             GOLD_FREE_PLACE_IMG,
             "[GOLD] Нажимаем свободное место.",
             window, screen_cv, region,
-            post_click_delay=0.2,
+            post_click_delay=1.0,
             max_attempts=1
         )
         if result == 'completed':
