@@ -793,8 +793,8 @@ def process_gold(screen_cv, region, last_gold_state, window):
                 GOLD_GO_IMG,
                 "[GOLD] Нажимаем 'Марш' для отправки отряда.",
                 window, screen_cv, region,
-                post_click_delay=1.5,
-                max_attempts=5
+                post_click_delay=0.5,
+                max_attempts=3
             )
             if result == 'completed':
                 return _complete_mission("[GOLD] ✓ Золотодобыча запущена через 'Марш'!")
@@ -810,8 +810,8 @@ def process_gold(screen_cv, region, last_gold_state, window):
                 GOLD_WORK_IMG,
                 "[GOLD] Нажимаем 'Добывать' для отправки отряда.",
                 window, screen_cv, region,
-                post_click_delay=0.5,
-                max_attempts=2
+                post_click_delay=0.2,
+                max_attempts=1
             )
             if result == 'completed':
                 return _complete_mission("[GOLD] ✓ Золотодобыча запущена!")
@@ -840,8 +840,8 @@ def process_gold(screen_cv, region, last_gold_state, window):
             return GoldState.UNKNOWN
 
         logger.info("[GOLD] В окне 'Общая сила' нет кнопки 'Добывать'/'Марш'. Подождём анимацию перед закрытием.")
-        # Даём до 2 секунд: GO-окно иногда появляется с задержкой после summary.
-        for _ in range(4):
+        # Даём до 1 секунды: GO-окно иногда появляется с задержкой после summary.
+        for _ in range(2):
             time.sleep(0.5)
             screen_cv = take_screenshot(window, region)
             if screen_cv is None:
@@ -859,8 +859,8 @@ def process_gold(screen_cv, region, last_gold_state, window):
             GOLD_GO_IMG,
             "[GOLD] Нажимаем 'GO' для отправки отряда.",
             window, screen_cv, region,
-            post_click_delay=1.5,
-            max_attempts=5
+            post_click_delay=0.5,
+            max_attempts=3
         )
         if result == 'completed':
             return _complete_mission("[GOLD] ✓ Золотодобыча запущена!")
@@ -901,8 +901,8 @@ def process_gold(screen_cv, region, last_gold_state, window):
             GOLD_WORK_IMG,
             "[GOLD] Нажимаем 'WORK' для отправки отряда.",
             window, screen_cv, region,
-            post_click_delay=0.5,
-            max_attempts=2
+            post_click_delay=0.2,
+            max_attempts=1
         )
         if result == 'completed':
             return _complete_mission("[GOLD] ✓ Золотодобыча запущена!")
@@ -924,8 +924,8 @@ def process_gold(screen_cv, region, last_gold_state, window):
             GOLD_GRIND_IMG,
             "[GOLD] Нажимаем 'GRIND'.",
             window, screen_cv, region,
-            post_click_delay=0.5,
-            max_attempts=2
+            post_click_delay=0.2,
+            max_attempts=1
         )
         if result == 'completed':
             return _complete_mission("[GOLD] ✓ Золотодобыча запущена!")
@@ -960,8 +960,8 @@ def process_gold(screen_cv, region, last_gold_state, window):
             GOLD_FREE_PLACE_IMG,
             "[GOLD] Нажимаем свободное место.",
             window, screen_cv, region,
-            post_click_delay=0.5,
-            max_attempts=2
+            post_click_delay=0.2,
+            max_attempts=1
         )
         if result == 'completed':
             return _complete_mission("[GOLD] ✓ Золотодобыча запущена!")
