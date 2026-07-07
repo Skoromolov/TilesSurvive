@@ -127,7 +127,8 @@ def process_heal(screen_cv, region, last_heal_state, window=None):
 
     if current_state == HealState.MAIN_SCREEN:
         _heal_menu_open_attempts = 0
-        return HealState.MAIN_SCREEN
+        # На главном экране нет mail/book/heal — режим heal завершён.
+        return HealState.COMPLETED
 
     if current_state == HealState.BOOK:
         _heal_menu_open_attempts = 0
