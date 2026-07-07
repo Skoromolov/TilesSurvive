@@ -584,7 +584,7 @@ def determine_gold_state(screen_cv, region):
             return GoldState.LEVEL_LIST_VISIBLE
 
     # 13. Попап события с кнопкой "Вперёд"
-    coords, _ = find_on_screen(get_template(GOLD_FORWARD_IMG), screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
+    coords, _ = find_on_screen(get_template(GOLD_FORWARD_IMG), screen_cv, region, threshold=0.55)
     if coords:
         return GoldState.FORWARD_POPUP_VISIBLE
 
