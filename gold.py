@@ -1106,7 +1106,9 @@ def process_gold(screen_cv, region, last_gold_state, window):
             # Проверяем, открылся ли попап с кнопкой 'Вперёд', на свежем скриншоте
             screen_after = take_screenshot(window, region)
             if screen_after is not None:
-                forward_coords, forward_conf = find_on_screen(get_template(GOLD_FORWARD_IMG), screen_after, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
+                # forward.png matches at conf~0.55-0.65 on the actual popup, below MEDIUM_THRESHOLD
+                forward_coords, forward_conf = find_on_screen(get_template(GOLD_FORWARD_IMG), screen_after, region, threshold=0.55)
+                logger.debug(f"[GOLD] Проверка попапа 'Вперёд': conf={forward_conf:.3f}, threshold=0.55")
                 if forward_coords:
                     logger.info(f"[GOLD] Попап 'Вперёд' открылся (conf={forward_conf:.3f}).")
                     return GoldState.FORWARD_POPUP_VISIBLE
@@ -1115,7 +1117,8 @@ def process_gold(screen_cv, region, last_gold_state, window):
                 time.sleep(GOLD_ACTION_DELAY)
                 screen_after2 = take_screenshot(window, region)
                 if screen_after2 is not None:
-                    forward_coords2, forward_conf2 = find_on_screen(get_template(GOLD_FORWARD_IMG), screen_after2, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
+                    forward_coords2, forward_conf2 = find_on_screen(get_template(GOLD_FORWARD_IMG), screen_after2, region, threshold=0.55)
+                    logger.debug(f"[GOLD] Проверка попапа 'Вперёд' (2): conf={forward_conf2:.3f}, threshold=0.55")
                     if forward_coords2:
                         logger.info(f"[GOLD] Попап 'Вперёд' открылся со второй попытки (conf={forward_conf2:.3f}).")
                         return GoldState.FORWARD_POPUP_VISIBLE
@@ -1128,7 +1131,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
         _gold_ctx['expected'] = 'rudnik_tab'
         # Делаем свежий скриншот перед кликом, т.к. попап мог появиться после предыдущего шага
         screen_now = take_screenshot(window, region) if window else screen_cv
-        clicked, _ = find_and_click(GOLD_FORWARD_IMG, screen_now, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
+        clicked, _ = find_and_click(GOLD_FORWARD_IMG, screen_now, region, threshold=0.55)
         if clicked:
             logger.info("[GOLD] Нажали 'Вперёд'. Ждём открытия табы рудника.")
             time.sleep(GOLD_ACTION_DELAY)
