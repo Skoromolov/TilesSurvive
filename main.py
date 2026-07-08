@@ -61,7 +61,7 @@ def _collect_default_activities(screen_cv, region, window):
     if found:
         logger.info("[DEFAULT] ✓ MAIL нажато, ждём попап подтверждения.")
         collected = True
-        time.sleep(1.0)
+        time.sleep(1)
         if window is not None:
             screen_cv = take_screenshot(window, region)
         find_and_click(CONFIRM_BUTTON_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
@@ -207,7 +207,7 @@ def main():
                         _return_to_main_screen(window, region, "gold active")
                     else:
                         logger.debug("[MAIN] Активная золотодобыча: ждём таймера в поселении.")
-                    time.sleep(5)
+                    time.sleep(1)
                     continue
 
                 # 7. Иначе — лечение как дефолтная активность, но сначала собираем книги/почту.

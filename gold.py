@@ -1273,7 +1273,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
         # Rate-limit: не жмём find.png чаще чем раз в 1.5 сек, иначе игра
         # не успевает обновить экран и свободное место занимают другие игроки.
         last_find_click = _gold_ctx.get('find_clicked_at', 0)
-        if time.time() - last_find_click >= 1.5:
+        if time.time() - last_find_click >= 1:
             find_and_click(GOLD_FIND_IMG, screen_cv, region)
             _gold_ctx['find_clicked_at'] = time.time()
         else:
