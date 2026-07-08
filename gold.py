@@ -302,15 +302,134 @@ def _check_recall_needed():
     return 'sync', remaining
 
 
+_GOLD_RAPID_POLL = 0.05
+_GOLD_RAPID_CHAIN_TIMEOUT = 6.0
+
+
 def _take_result_screenshot(window, region, delay=None):
     """Сделать скриншот после клика и подождать GOLD_ACTION_DELAY."""
     if delay is None:
         delay = GOLD_ACTION_DELAY
     time.sleep(delay)
     screen_after = take_screenshot(window, region)
-    if screen_after is None:
-        logger.warning("[GOLD] Не удалось получить скриншот результата, берём старый кадр.")
     return screen_after
+
+
+def _fresh_or_current(window, region, current):
+    """Получить свежий скриншот, не заменяя numpy-array на старый при сбое."""
+    fresh = take_screenshot(window, region)
+    return fresh if fresh is not None else current
+
+
+def _rapid_capture_chain(initial_state, screen_cv, region, window):
+    """
+    Быстрая цепочка захвата свободного места.
+    Выполняет клики free_place → 'Добывать' → 'Марш' → complete в одном вызове,
+    используя polling с интервалом 0.05 сек, вместо разбросанных sleep 0.2-0.5 сек.
+    """
+    chain_start = time.time()
+    screen = screen_cv
+    last_state = initial_state
+
+    while time.time() - chain_start < _GOLD_RAPID_CHAIN_TIMEOUT:
+        current_state = determine_gold_state(screen, region)
+        if current_state != last_state:
+            logger.debug(f"[GOLD] Быстрая цепочка: {last_state.value} -> {current_state.value}")
+            last_state = current_state
+
+        # ---- GO / МАРШ ----
+        if current_state == GoldState.GO_VISIBLE:
+            result, screen = _click_and_check_completion(
+                GOLD_GO_IMG,
+                "[GOLD] Нажимаем 'Марш' (быстрая цепочка).",
+                window, screen, region,
+                post_click_delay=_GOLD_RAPID_POLL,
+                max_attempts=8
+            )
+            if result == 'completed':
+                return _complete_mission("[GOLD] ✓ Золотодобыча запущена через 'Марш'!")
+            # go/summary/wait/other — перечитаем кадр и продолжим
+            screen = _fresh_or_current(window, region, screen)
+            continue
+
+        # ---- SUMMARY / WORK ----
+        if current_state in (GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE, GoldState.WORK_VISIBLE):
+            # Если одновременно видна кнопка Марш — сразу её
+            go_coords, _ = find_on_screen(get_template(GOLD_GO_IMG), screen, region)
+            if go_coords:
+                result, screen = _click_and_check_completion(
+                    GOLD_GO_IMG,
+                    "[GOLD] Нажимаем 'Марш' из окна 'Общая сила'.",
+                    window, screen, region,
+                    post_click_delay=_GOLD_RAPID_POLL,
+                    max_attempts=8
+                )
+                if result == 'completed':
+                    return _complete_mission("[GOLD] ✓ Золотодобыча запущена через 'Марш'!")
+                screen = _fresh_or_current(window, region, screen)
+                continue
+
+            work_coords, _ = find_on_screen(get_template(GOLD_WORK_IMG), screen, region)
+            if not work_coords:
+                # Кнопка Добывать ещё не появилась — короткий poll
+                screen = _fresh_or_current(window, region, screen)
+                if time.time() - chain_start > 1.5:
+                    logger.info("[GOLD] В окне 'Общая сила' не появилась кнопка 'Добывать'. Закрываем.")
+                    return _close_to_rudkin_tab(screen, region, window)
+                continue
+
+            result, screen = _click_and_check_completion(
+                GOLD_WORK_IMG,
+                "[GOLD] Нажимаем 'Добывать' (быстрая цепочка).",
+                window, screen, region,
+                post_click_delay=_GOLD_RAPID_POLL,
+                max_attempts=8
+            )
+            if result == 'completed':
+                return _complete_mission("[GOLD] ✓ Золотодобыча запущена!")
+            if result == 'summary':
+                # Место занято
+                return _close_to_rudkin_tab(screen, region, window)
+            if result == 'go':
+                # Открылся диалог 'Марш' — следующая итерация его обработает
+                screen = _fresh_or_current(window, region, screen)
+                continue
+            if result in ('wait', 'other'):
+                screen = _fresh_or_current(window, region, screen)
+                continue
+            screen = _fresh_or_current(window, region, screen)
+            continue
+
+        # ---- FREE PLACE ----
+        if current_state == GoldState.FREE_PLACE_VISIBLE:
+            result, screen = _click_and_check_completion(
+                GOLD_FREE_PLACE_IMG,
+                "[GOLD] Нажимаем свободное место (быстрая цепочка).",
+                window, screen, region,
+                post_click_delay=_GOLD_RAPID_POLL,
+                max_attempts=3
+            )
+            if result == 'completed':
+                return _complete_mission("[GOLD] ✓ Золотодобыча запущена!")
+            if result in ('go', 'summary', 'wait', 'other'):
+                screen = _fresh_or_current(window, region, screen)
+                continue
+            # всё ещё free — poll ещё раз
+            screen = _fresh_or_current(window, region, screen)
+            if time.time() - chain_start > 1.0:
+                logger.info("[GOLD] Свободное место не нажалось, продолжаем обычный цикл.")
+                return GoldState.FREE_PLACE_VISIBLE
+            continue
+
+        # ---- Активная добыча — уже отправлено ----
+        if current_state in (GoldState.MY_RUDNIK_VISIBLE, GoldState.RETURN_BUTTON_VISIBLE, GoldState.RAID_LEVEL_ICON_VISIBLE):
+            return _complete_mission("[GOLD] ✓ Золотодобыча уже активна.")
+
+        # Состояние вне цепочки — передаём управление обратно в основной процесс
+        return current_state
+
+    logger.info("[GOLD] Быстрая цепочка превысила лимит времени. Возвращаем UNKNOWN.")
+    return GoldState.UNKNOWN
 
 
 def _click_and_check_completion(button_img, log_msg, window, screen_cv, region, post_click_delay=None, max_attempts=1):
@@ -335,7 +454,14 @@ def _click_and_check_completion(button_img, log_msg, window, screen_cv, region, 
             return 'completed', None
         if result == 'summary':
             return 'summary', None
-        # Если не завершено и не summary, возможно появится GO/MARCH позже.
+        if result == 'go':
+            return 'go', screen_after
+        if result == 'wait':
+            if attempt == max_attempts:
+                return 'wait', screen_after
+            logger.debug(f"[GOLD] Попытка {attempt}: анимация отправки, ждём ещё.")
+            continue
+        # Если не завершено, не summary и не go/wait, возможно появится GO/MARCH позже.
         # Повторяем скриншот до max_attempts.
         if attempt < max_attempts:
             logger.debug(f"[GOLD] Попытка {attempt}: результат не определён, ждём ещё.")
@@ -480,11 +606,11 @@ def click_moveon_for_target_level(screen_cv, region, target=GOLD_LEVEL, lvl_thre
     if btn_matches:
         for cx_btn, cy_btn, conf_btn in btn_matches:
             for cx_lvl_i, cy_lvl_i, conf_lvl_i in lvl_matches:
-                vertical_gap = abs(cy_btn - cy_lvl_i)
+                vertical_gap = cy_btn - cy_lvl_i
                 horizontal_gap = abs(cx_btn - cx_lvl_i)
-                # Кнопка "Перейти" — большая (254x50), карточка уровня ~270px высотой.
-                # Увеличили допустимый vertical_gap до h_btn * 6 (было 3).
-                if vertical_gap < h_btn * 6 and horizontal_gap < max(w_btn, w_lvl) * 3:
+                # Кнопка "Перейти" находится ПОД текстом уровня (не выше).
+                # Карточка уровня ~270px, кнопка 50px; допускаем gap до h_btn * 5.
+                if 0 < vertical_gap < h_btn * 5 and horizontal_gap < max(w_btn, w_lvl) * 1.5:
                     score = conf_lvl_i + conf_btn - vertical_gap / 100.0
                     if score > best_score:
                         best_score = score
@@ -956,9 +1082,17 @@ def process_gold(screen_cv, region, last_gold_state, window):
         if level_state is not None:
             return level_state
 
+        return _rapid_capture_chain(current_state, screen_cv, region, window)
+
+    # ---- SUMMARY / WORK / GO ----
+    if current_state in (GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE, GoldState.WORK_VISIBLE, GoldState.GO_VISIBLE):
+        return _rapid_capture_chain(current_state, screen_cv, region, window)
+
+    # ---- GRIND ----
+    if current_state == GoldState.GRIND_VISIBLE:
         result, screen_after = _click_and_check_completion(
-            GOLD_FREE_PLACE_IMG,
-            "[GOLD] Нажимаем свободное место.",
+            GOLD_GRIND_IMG,
+            "[GOLD] Нажимаем 'GRIND'.",
             window, screen_cv, region,
             post_click_delay=0.2,
             max_attempts=1
@@ -966,28 +1100,25 @@ def process_gold(screen_cv, region, last_gold_state, window):
         if result == 'completed':
             return _complete_mission("[GOLD] ✓ Золотодобыча запущена!")
         if result == 'go':
-            logger.info("[GOLD] После 'FREE_PLACE' открылось окно с 'Марш'. Обработаем его.")
-            return GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE
+            logger.info("[GOLD] После 'GRIND' открылось окно с 'Марш'. Обработаем его.")
+            return _rapid_capture_chain(GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE, screen_after or screen_cv, region, window)
         if result == 'summary':
-            logger.info("[GOLD] После 'FREE_PLACE' открылось окно 'Общая сила'.")
-            return GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE
+            logger.info("[GOLD] После 'GRIND' открылось окно 'Общая сила'.")
+            return _rapid_capture_chain(GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE, screen_after or screen_cv, region, window)
+        if result == 'wait':
+            logger.info("[GOLD] После 'GRIND' окно 'Общая сила' ещё на экране — анимация. Подождём.")
+            time.sleep(1.0)
+            return GoldState.GRIND_VISIBLE
 
         screen_for_check = screen_after if screen_after is not None else screen_cv
-        # Если после нажатия ничего не изменилось — возможно, клик не прошёл
-        still_free, _ = find_on_screen(get_template(GOLD_FREE_PLACE_IMG), screen_for_check, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
-        if still_free:
-            logger.info("[GOLD] Свободное место всё ещё видно. Попробуем кликнуть ещё раз в следующей итерации.")
-            _gold_ctx['expected'] = 'free_place'
-            return GoldState.FREE_PLACE_VISIBLE
+        free_coords, _ = find_on_screen(get_template(GOLD_FREE_PLACE_IMG), screen_for_check, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
+        if free_coords:
+            logger.info("[GOLD] После 'GRIND' найдено свободное место.")
+            return _rapid_capture_chain(GoldState.FREE_PLACE_VISIBLE, screen_for_check, region, window)
 
-        # Проверим, не открылось ли GO-окно
-        go_coords, _ = find_on_screen(get_template(GOLD_GO_IMG), screen_for_check, region)
-        if go_coords:
-            logger.info("[GOLD] После 'FREE_PLACE' открылось окно с 'Марш' (быстрая проверка). Обработаем его.")
-            return GoldState.GO_VISIBLE
-
-        logger.info("[GOLD] После 'FREE_PLACE' не появилось окна отправки. Продолжаем.")
-        return GoldState.UNKNOWN
+        _gold_ctx['expected'] = 'rudnik_tab'
+        _gold_ctx['need_level_check'] = True
+        return GoldState.RUDNIK_TAB
 
     # ---- MY RUDNIK / ACTIVE MINING ----
     if current_state in (GoldState.MY_RUDNIK_VISIBLE, GoldState.RAID_LEVEL_ICON_VISIBLE):

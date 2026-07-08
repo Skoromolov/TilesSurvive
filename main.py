@@ -44,6 +44,31 @@ def _return_to_main_screen(window, region, reason):
     ensure_exit_to_main_screen(window, region)
 
 
+def _collect_default_activities(screen_cv, region, window):
+    """
+    Собрать книги и почту на главном экране поселения.
+    Выполняется в DEFAULT перед переключением в HEAL.
+    Возвращает True, если была нажата хотя бы одна активность.
+    """
+    collected = False
+
+    found, _ = find_and_click(BOOK_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+    if found:
+        logger.info("[DEFAULT] ✓ Книга собрана.")
+        collected = True
+
+    found, _ = find_and_click(MAIL_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+    if found:
+        logger.info("[DEFAULT] ✓ MAIL нажато, ждём попап подтверждения.")
+        collected = True
+        time.sleep(1.0)
+        if window is not None:
+            screen_cv = take_screenshot(window, region)
+        find_and_click(CONFIRM_BUTTON_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+
+    return collected
+
+
 # ==========================================
 # ОСНОВНОЙ ЦИКЛ
 # ==========================================
@@ -173,17 +198,23 @@ def main():
                     gold_start_time = time.time()
                     continue
 
-                # 6a. Активная золотодобыча без необходимости отзыва — не блокируем HEAL/сбор.
-                # Просто убеждаемся, что бот в поселении, и даём main loop продолжить нормальный цикл.
+                # 6a. Активная золотодобыча без необходимости отзыва — не переключаемся в лечение/сбор.
+                # В этом состоянии бот должен просто ждать таймера рейда/рудинка,
+                # не собирая активности и не уходя в режим HEAL.
                 if GOLD_ENABLED and gold_mission_active() and not gold_mission_should_recall():
                     if not is_at_main_screen_village(screen_cv, region):
-                        logger.info("[MAIN] Активная золотодобыча: выходим в поселение, но не прерываем сбор/лечение.")
+                        logger.info("[MAIN] Активная золотодобыча: выходим в поселение и ждём таймера.")
                         _return_to_main_screen(window, region, "gold active")
                     else:
-                        logger.debug("[MAIN] Активная золотодобыча: уже в поселении, продолжаем обычный цикл.")
-                    # Не делаем continue — падаем в HEAL/сбор ниже.
+                        logger.debug("[MAIN] Активная золотодобыча: ждём таймера в поселении.")
+                    time.sleep(5)
+                    continue
 
-                # 7. Иначе — лечение как дефолтная активность
+                # 7. Иначе — лечение как дефолтная активность, но сначала собираем книги/почту.
+                if _collect_default_activities(screen_cv, region, window):
+                    time.sleep(1)
+                    continue
+
                 logger.debug("[MAIN] Переключение в режим HEAL (дефолт)")
                 current_mode = MainMode.HEAL
                 last_heal_state = None
