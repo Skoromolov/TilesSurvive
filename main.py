@@ -52,12 +52,32 @@ def _collect_default_activities(screen_cv, region, window):
     """
     collected = False
 
-    found, _ = find_and_click(BOOK_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+    def _debug_save(label):
+        if window is None:
+            return
+        try:
+            import cv2, os, time as _time
+            shot = take_screenshot(window, region)
+            if shot is not None:
+                os.makedirs(DEBUG_SCREENSHOTS_DIR, exist_ok=True)
+                path = os.path.join(DEBUG_SCREENSHOTS_DIR, f"collect_{label}_{_time.strftime('%Y%m%d_%H%M%S')}.png")
+                cv2.imwrite(path, shot)
+                logger.info(f"[DEBUG] сохранён скриншот: {path}")
+        except Exception as e:
+            logger.debug(f"[DEBUG] не удалось сохранить скриншот: {e}")
+
+    _debug_save('book_before')
+    found, coords = find_and_click(BOOK_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+    logger.info(f"[DEBUG] BOOK found={found}, coords={coords}")
+    _debug_save('book_after')
     if found:
         logger.info("[DEFAULT] ✓ Книга собрана.")
         collected = True
 
-    found, _ = find_and_click(MAIL_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+    _debug_save('mail_before')
+    found, coords = find_and_click(MAIL_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+    logger.info(f"[DEBUG] MAIL found={found}, coords={coords}")
+    _debug_save('mail_after')
     if found:
         logger.info("[DEFAULT] ✓ MAIL нажато, ждём попап подтверждения.")
         collected = True

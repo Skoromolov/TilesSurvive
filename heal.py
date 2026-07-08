@@ -15,10 +15,20 @@ def determine_heal_state(screen_cv, region):
     Определить текущее состояние лечения.
     Возвращает: HealState
     """
-    # Сначала проверяем главный экран поселения — высший приоритет,
-    # чтобы не уходить в UNKNOWN, когда мы уже дома.
-    # Требуем хотя бы два независимых индикатора, потому что wild_earth
-    # и village false-match на фоне экрана активной золотодобычи.
+    # Сначала проверяем активные элементы лечения/помощи на любом экране —
+    # они имеют приоритет, чтобы не завершить HEAL раньше времени.
+    coords, help_conf = find_on_screen(get_template(HEAL_HELP_HANDS_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+    if coords:
+        logger.debug(f"[determine_heal_state] HEAL_HELP_HANDS_IMG найден (conf={help_conf:.3f}) -> HEAL_HELP")
+        return HealState.HEAL_HELP
+
+    coords, help2_conf = find_on_screen(get_template(HELP_HANDS_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+    if coords:
+        logger.debug(f"[determine_heal_state] HELP_HANDS_IMG найден (conf={help2_conf:.3f}) -> HELP_HANDS")
+        return HealState.HELP_HANDS
+
+    # Проверяем главный экран поселения — требуем хотя бы два независимых
+    # индикатора, потому что wild_earth и village false-match на фоне шахты/рейда.
     main_indicators = 0
     coords, wild_conf = find_on_screen(get_template(WILD_EARTH_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if coords:
@@ -32,8 +42,8 @@ def determine_heal_state(screen_cv, region):
 
     coords, _ = find_on_screen(get_template(HEAL_TOWN_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if coords:
-        logger.debug("[determine_heal_state] HEAL_TOWN_IMG найден")
-        main_indicators += 1
+        logger.debug("[determine_heal_state] HEAL_TOWN_IMG найден -> HEAL_ICON")
+        return HealState.HEAL_ICON
 
     coords, _ = find_on_screen(get_template(SOUZ_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if coords:
@@ -80,13 +90,15 @@ def determine_heal_state(screen_cv, region):
         logger.debug(f"[determine_heal_state] HEAL_TOWN_IMG найден (conf={heal_town_conf:.3f}) -> HEAL_ICON")
         return HealState.HEAL_ICON
 
+    # Руки помощи fallback с пониженным порогом
+    coords, help_fallback_conf = find_on_screen(get_template(HEAL_HELP_HANDS_IMG), screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
+    if coords:
+        logger.debug(f"[determine_heal_state] HEAL_HELP_HANDS_IMG найден с пониженным порогом (conf={help_fallback_conf:.3f}) -> HEAL_HELP")
+        return HealState.HEAL_HELP
+
     coords, _ = find_on_screen(get_template(HELP_HANDS_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
     if coords:
         return HealState.HELP_HANDS
-
-    coords, _ = find_on_screen(get_template(HEAL_HELP_HANDS_IMG), screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
-    if coords:
-        return HealState.HEAL_HELP
 
     coords, _ = find_on_screen(get_template(HEAL_WAIT_IMG), screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
     if coords:
@@ -146,61 +158,64 @@ def process_heal(screen_cv, region, last_heal_state, window=None):
 
     if current_state == HealState.HEAL_ICON:
         _heal_menu_open_attempts = 0
-        found, _ = find_and_click(HEAL_TOWN_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        save_debug_screenshot(screen_cv, "heal_icon_before_click")
+        found, coords = find_and_click(HEAL_TOWN_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
         if found:
-            # Ждём открытия меню лечения — анимация может занимать до 1.5 сек
+            logger.info(f"[HEAL] Нажата иконка лечения {HEAL_TOWN_IMG} at {coords}, ждём открытия меню.")
             time.sleep(1.5)
-            if window is None:
-                return HealState.HEAL_MENU_OPEN
-            screen_new = take_screenshot(window, region)
-            # Ищем кнопки с пониженным порогом, т.к. кнопка может быть частично перекрыта
-            found_free, _ = find_and_click(HEAL_FREE_BUTTON_IMG, screen_new, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
-            if found_free:
-                logger.info("[HEAL] ✓ Бесплатное лечение нажато!")
-                return HealState.MAIN_SCREEN
-            found_heal, _ = find_and_click(HEAL_BUTTON_IMG, screen_new, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
-            if found_heal:
-                logger.info("[HEAL] ✓ Обычное лечение нажато!")
-                return HealState.MAIN_SCREEN
-            logger.info("[HEAL] Меню лечения открыто, кнопки пока не найдены — остаёмся в меню.")
             return HealState.HEAL_MENU_OPEN
+        save_debug_screenshot(screen_cv, "heal_icon_after_click")
         return None
 
     if current_state == HealState.HEAL_HELP:
         _heal_menu_open_attempts = 0
-        found, _ = find_and_click(HEAL_HELP_HANDS_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        save_debug_screenshot(screen_cv, "heal_help_before_click")
+        found, coords = find_and_click(HEAL_HELP_HANDS_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
         if found:
-            return None
-        return None
+            logger.info(f"[HEAL] ✓ Нажаты руки помощи {HEAL_HELP_HANDS_IMG} at {coords}.")
+            return HealState.HEAL_WAIT
+        # Fallback: попробуем с пониженным порогом и залогируем confidence
+        coords, conf = find_on_screen(get_template(HEAL_HELP_HANDS_IMG), screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
+        if coords:
+            logger.info(f"[HEAL] Руки помощи найдены с пониженным порогом (conf={conf:.3f}), нажимаем.")
+            click_at(coords[0], coords[1])
+            return HealState.HEAL_WAIT
+        save_debug_screenshot(screen_cv, "heal_help_not_found")
+        logger.warning(f"[HEAL] Руки помощи не найдены (max_conf={conf:.3f}), остаёмся в ожидании.")
+        return HealState.HEAL_WAIT
 
     if current_state == HealState.HEAL_ACTIVE:
         _heal_menu_open_attempts = 0
-        found, _ = find_and_click(HEAL_HELP_HANDS_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        found, coords = find_and_click(HEAL_HELP_HANDS_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
         if found:
-            return None
+            logger.info(f"[HEAL] ✓ Нажаты руки помощи (HEAL_ACTIVE) at {coords}.")
+            return HealState.HEAL_WAIT
+        save_debug_screenshot(screen_cv, "heal_active_no_hands")
         return HealState.HEAL_ACTIVE
 
     if current_state == HealState.HEAL_WAIT:
         _heal_menu_open_attempts = 0
         logger.info("[HEAL] Лечение в процессе. Ожидаем завершения.")
+        save_debug_screenshot(screen_cv, "heal_wait")
         return HealState.HEAL_WAIT
 
     if current_state == HealState.HEAL_MENU_OPEN:
         _heal_menu_open_attempts += 1
         logger.info(f"[HEAL] Меню лечения открыто (попытка {_heal_menu_open_attempts}/{_MAX_HEAL_MENU_ATTEMPTS}).")
+        save_debug_screenshot(screen_cv, "heal_menu_open")
 
         # Пытаемся найти и нажать кнопку бесплатного лечения, если доступна
         found, _ = find_and_click(HEAL_FREE_BUTTON_IMG, screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
         if found:
-            logger.info("[HEAL] ✓ Бесплатное лечение нажато!")
+            logger.info("[HEAL] ✓ Бесплатное лечение нажато! Ожидаем завершения.")
             _heal_menu_open_attempts = 0
-            return HealState.MAIN_SCREEN
+            return HealState.HEAL_WAIT
         # Если бесплатное лечение недоступно, используем обычное лечение
         found, _ = find_and_click(HEAL_BUTTON_IMG, screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
         if found:
-            logger.info("[HEAL] ✓ Обычное лечение нажато!")
+            logger.info("[HEAL] ✓ Обычное лечение нажато! Ожидаем завершения.")
             _heal_menu_open_attempts = 0
-            return HealState.MAIN_SCREEN
+            return HealState.HEAL_WAIT
 
         # Если кнопки не найдены, но попыток ещё мало — даём анимации/загрузке время
         if _heal_menu_open_attempts < _MAX_HEAL_MENU_ATTEMPTS:
@@ -210,6 +225,7 @@ def process_heal(screen_cv, region, last_heal_state, window=None):
 
         # Если кнопки так и не появились — закрываем меню
         logger.info("[HEAL] Кнопки лечения не появились после нескольких попыток. Закрываем меню.")
+        save_debug_screenshot(screen_cv, "heal_menu_timeout")
         find_and_click(BACK_IMG, screen_cv, region)
         _heal_menu_open_attempts = 0
         return HealState.UNKNOWN
