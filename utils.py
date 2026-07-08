@@ -431,4 +431,4 @@ def save_debug_screenshot(screen_cv, step_name):
     filename = f"{timestamp}_{step_name}.png"
     filepath = os.path.join(DEBUG_SCREENSHOTS_DIR, filename)
     cv2.imwrite(filepath, screen_cv)
-    logger.info(f"[DEBUG] Скриншот сохранён: {filepath}")
+    logger.debug(f"[DEBUG] Скриншот сохранён: {filepath}")
