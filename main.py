@@ -198,17 +198,15 @@ def main():
                     gold_start_time = time.time()
                     continue
 
-                # 6a. Активная золотодобыча без необходимости отзыва — не переключаемся в лечение/сбор.
-                # В этом состоянии бот должен просто ждать таймера рейда/рудинка,
-                # не собирая активности и не уходя в режим HEAL.
+                # 6a. Активная золотодобыча без необходимости отзыва — убеждаемся, что бот в поселении,
+                # но не блокируем сбор и HEAL. Один раз выходим на главный экран, затем падаем
+                # в обычный дефолтный поток (книги/почта/HEAL/raid), пока не пришло время recall.
                 if GOLD_ENABLED and gold_mission_active() and not gold_mission_should_recall():
                     if not is_at_main_screen_village(screen_cv, region):
-                        logger.info("[MAIN] Активная золотодобыча: выходим в поселение и ждём таймера.")
+                        logger.info("[MAIN] Активная золотодобыча: выходим в поселение.")
                         _return_to_main_screen(window, region, "gold active")
                     else:
-                        logger.debug("[MAIN] Активная золотодобыча: ждём таймера в поселении.")
-                    time.sleep(1)
-                    continue
+                        logger.debug("[MAIN] Активная золотодобыча: уже в поселении.")
 
                 # 7. Иначе — лечение как дефолтная активность, но сначала собираем книги/почту.
                 if _collect_default_activities(screen_cv, region, window):
