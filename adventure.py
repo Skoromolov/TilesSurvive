@@ -63,7 +63,7 @@ def process_adventure_state(screen_cv, region, last_adventure_state, window, cur
     if current_state == AdventureState.BAGGAGE_POPUP:
         logger.info("[ADVENTURE] На попапе багажа, нажимаем get_big_button.png для сбора награды.")
         _adventure_get_attempts += 1
-        if _adventure_get_attempts > 5:
+        if _adventure_get_attempts > 8:
             logger.warning("[ADVENTURE] Слишком много попыток сбора приключения. Выходим.")
             _adventure_get_attempts = 0
             ensure_exit_to_main_screen(window, region)
@@ -81,6 +81,10 @@ def process_adventure_state(screen_cv, region, last_adventure_state, window, cur
                 if screen_cv is not None:
                     find_and_click(BACK_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
             time.sleep(0.5)
+            screen_cv = take_screenshot(window, region)
+            if screen_cv is not None and find_on_screen(get_template(ADVENTURE_BAGGAGE_POPUP_IMG), screen_cv, region, CONFIDENCE_MEDIUM_THRESHOLD)[0]:
+                logger.info("[ADVENTURE] Попап всё ещё открыт, продолжаем сбор.")
+                return AdventureState.BAGGAGE_POPUP
             return AdventureState.UNKNOWN
 
         screen_cv = take_screenshot(window, region)

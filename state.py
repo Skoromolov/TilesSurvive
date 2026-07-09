@@ -11,6 +11,7 @@ STATE_FILE = STATE_DIR / "bot_state.json"
 LAST_GOLD_TIME_KEY = "last_gold_time"
 STARTED_AT_KEY = "gold_started_at"
 RECALL_REQUESTED_KEY = "gold_recall_requested"
+FORCE_RECLAIM_KEY = "gold_force_reclaim"
 
 
 def _ensure_state_dir():

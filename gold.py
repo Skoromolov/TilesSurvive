@@ -8,7 +8,7 @@ import cv2
 from config import *
 from utils import *
 from logger import logger  # Импортируем логгер
-from state import load_state, update_state, LAST_GOLD_TIME_KEY, STARTED_AT_KEY, RECALL_REQUESTED_KEY
+from state import load_state, update_state, LAST_GOLD_TIME_KEY, STARTED_AT_KEY, RECALL_REQUESTED_KEY, FORCE_RECLAIM_KEY
 
 
 # ==========================================
@@ -33,14 +33,15 @@ _gold_ctx = {
     'raid_icon_clicks': 0,
     'find_started_at': None,
     'exit_attempts': 0,
+    'force_reclaim': _saved_state.get(FORCE_RECLAIM_KEY, False),
 }
 gold_first_run = True         # при первом запуске сразу идём в золото после heal/raid, не ждём GOLD_INTERVAL
-
 
 
 # ==========================================
 # ТАЙМЕР / ПРОВЕРКА ПОРЫ
 # ==========================================
+
 def should_do_gold():
     """True если прошло GOLD_INTERVAL с последнего посещения."""
     global last_gold_time, gold_first_run
@@ -61,9 +62,10 @@ def should_do_gold():
 
 
 def update_gold_time():
-    """Обновить время последнего посещения рудника."""
+    """Обновить время последнего посещения рудника и сохранить в файл."""
     global last_gold_time
     last_gold_time = time.time()
+    update_state(**{LAST_GOLD_TIME_KEY: last_gold_time})
     logger.info(f"[GOLD] Время обновлено: {time.ctime(last_gold_time)}")
 
 
@@ -78,12 +80,9 @@ def gold_mission_should_recall():
     return recall_status == 'recall'
 
 
-def update_gold_time():
-    """Обновить время последнего посещения рудника и сохранить в файл."""
-    global last_gold_time
-    last_gold_time = time.time()
-    update_state(**{LAST_GOLD_TIME_KEY: last_gold_time})
-    logger.info(f"[GOLD] Время обновлено: {time.ctime(last_gold_time)}")
+def gold_mission_should_reclaim():
+    """Нужно немедленно перезанять освободившееся место после отзыва/завершения."""
+    return _gold_ctx.get('force_reclaim', False)
 
 
 def start_gold_mission():
@@ -126,6 +125,8 @@ def reset_gold_context():
 # ==========================================
 def _complete_mission(log_msg="[GOLD] ✓ Золотодобыча запущена!"):
     """Зафиксировать успешный запуск и вернуть COMPLETED."""
+    _gold_ctx['force_reclaim'] = False
+    update_state(**{FORCE_RECLAIM_KEY: False})
     start_gold_mission()
     update_gold_time()
     logger.info(log_msg)
@@ -257,12 +258,14 @@ def _ensure_target_level(screen_cv, region, window=None, log_prefix="[GOLD]"):
 
 def _click_top_screen(region, reset_main_tries=False):
     """Клик в верхнюю часть экрана для закрытия попапа/сброса UI."""
-    click_x = region[0] + region[2] // 2
-    click_y = region[1] + int(region[3] * 0.15)
-    pyautogui.click(click_x, click_y)
-    time.sleep(GOLD_ACTION_DELAY)
-    if reset_main_tries:
+    click_top_screen_safe(region)
+    if reset_main_tries and isinstance(_gold_ctx, dict) and 'main_screen_tries' in _gold_ctx:
         _gold_ctx['main_screen_tries'] = 0
+
+
+# Алиасы для обратной совместимости — теперь определены в utils.py.
+# click_top_screen_safe = click_top_screen_safe
+# click_top_screen_fallback = click_top_screen_fallback
 
 
 def _check_recall_needed():
@@ -855,6 +858,8 @@ def process_gold(screen_cv, region, last_gold_state, window):
         clear_gold_mission()
         _gold_ctx['expected'] = 'rudnik_tab'
         _gold_ctx['need_level_check'] = True
+        _gold_ctx['force_reclaim'] = True
+        update_state(**{FORCE_RECLAIM_KEY: True})
         logger.info("[GOLD] Отряд отозван.")
         return GoldState.RUDNIK_TAB
 
@@ -866,6 +871,8 @@ def process_gold(screen_cv, region, last_gold_state, window):
         clear_gold_mission()
         _gold_ctx['need_level_check'] = True
         _gold_ctx['expected'] = 'rudnik_tab'
+        _gold_ctx['force_reclaim'] = True
+        update_state(**{FORCE_RECLAIM_KEY: True})
         return GoldState.RUDNIK_TAB
 
     # ---- ADVICE / 45-MIN POPUP ----
@@ -1147,6 +1154,26 @@ def process_gold(screen_cv, region, last_gold_state, window):
             logger.info("[GOLD] recall_requested, но не видно ни return.png, ни my_rudnik.png. Ждём.")
             time.sleep(GOLD_ACTION_DELAY)
             return GoldState.UNKNOWN
+
+        # Добыча активна, отзыв не требуется. Если мы уже сидим на руднике
+        # (RAID_LEVEL_ICON_VISIBLE / MY_RUDNIK_VISIBLE) и _gold_ctx['started_at']
+        # не задан — значит бот зашёл в золото, но миссия не запущена как завершённая.
+        # Вместо мгновенного выхода пытаемся открыть детали рудника, чтобы увидеть
+        # WORK/GRIND/GO и реально запустить добычу.
+        if _gold_ctx.get('started_at') is None:
+            my_rudnik_coords, _ = find_on_screen(get_template(GOLD_MY_RUDNIK_IMG), screen_cv, region)
+            if my_rudnik_coords:
+                logger.info("[GOLD] Миссия не зафиксирована, но видна кнопка 'Мой рудник'. Открываем детали для запуска.")
+                find_and_click(GOLD_MY_RUDNIK_IMG, screen_cv, region)
+                time.sleep(GOLD_ACTION_DELAY)
+                return GoldState.UNKNOWN
+            # Если my_rudnik.png не видна — возможно, это уже открытое окно рудника
+            # с кнопкой WORK/GRIND. Пропускаем в UNKNOWN, чтобы determine_* увидел их.
+            work_coords, _ = find_on_screen(get_template(GOLD_WORK_IMG), screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
+            grind_coords, _ = find_on_screen(get_template(GOLD_GRIND_IMG), screen_cv, region, threshold=CONFIDENCE_MEDIUM_THRESHOLD)
+            if work_coords or grind_coords:
+                logger.info("[GOLD] Миссия не зафиксирована, но видны кнопки WORK/GRIND. Продолжаем обработку.")
+                return GoldState.UNKNOWN
 
         # Добыча активна, отзыв не требуется — выходим
         started = _gold_ctx.get('started_at')

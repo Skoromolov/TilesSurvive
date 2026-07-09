@@ -210,7 +210,7 @@ def main():
                         continue
 
                 # 6. Проверяем золото
-                if GOLD_ENABLED and (should_do_gold() or gold_mission_should_recall()):
+                if GOLD_ENABLED and (should_do_gold() or gold_mission_should_recall() or gold_mission_should_reclaim()):
                     logger.info("[MAIN] Переключение в режим GOLD")
                     current_mode = MainMode.GOLD
                     last_gold_state = None
@@ -279,6 +279,13 @@ def main():
 
                 # Если добыча завершена — выходим в поселение и возвращаемся в DEFAULT
                 if last_gold_state == GoldState.COMPLETED:
+                    if _gold_ctx.get('force_reclaim'):
+                        logger.info("[MAIN] Золотодобыча завершена, но нужно немедленно перезанять рудник. Продолжаем GOLD.")
+                        _gold_ctx['force_reclaim'] = False
+                        update_state(**{FORCE_RECLAIM_KEY: False})
+                        last_gold_state = None
+                        gold_start_time = time.time()
+                        continue
                     logger.info("[MAIN] Золотодобыча завершена, запускаем выход в поселение")
                     _return_to_main_screen(window, region, "GOLD completed")
                     current_mode = MainMode.DEFAULT
