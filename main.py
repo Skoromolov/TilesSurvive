@@ -25,6 +25,7 @@ from utils import *
 from heal import *
 from raid import *
 from gold import *
+from gold import _gold_ctx
 from adventure import process_adventure_state, determine_adventure_state, reset_adventure_context
 from logger import logger  # Импортируем логгер
 
@@ -164,7 +165,7 @@ def main():
                 logger.debug("[MAIN] DEFAULT: выбор режима")
 
                 # 1. Принудительный режим RAID
-                if FORCE_RAID_ONLY and not FORCE_HEAL_ONLY:
+                if FORCE_RAID_ONLY and not FORCE_HEAL_ONLY and RAID_ENABLED:
                     logger.info("[MAIN] Переключение в принудительный режим RAID")
                     current_mode = MainMode.RAID
                     last_raid_state = None
@@ -189,7 +190,7 @@ def main():
                     continue
 
                 # 4. Проверяем рейды
-                if check_for_raid_button(screen_cv, region):
+                if RAID_ENABLED and check_for_raid_button(screen_cv, region):
                     logger.info("[MAIN] Переключение в режим RAID (найдена кнопка рейда)")
                     current_mode = MainMode.RAID
                     last_gold_state = None
@@ -279,9 +280,9 @@ def main():
 
                 # Если добыча завершена — выходим в поселение и возвращаемся в DEFAULT
                 if last_gold_state == GoldState.COMPLETED:
-                    if _gold_ctx.get('force_reclaim'):
+                    if _gold_ctx.force_reclaim:
                         logger.info("[MAIN] Золотодобыча завершена, но нужно немедленно перезанять рудник. Продолжаем GOLD.")
-                        _gold_ctx['force_reclaim'] = False
+                        _gold_ctx.force_reclaim = False
                         update_state(**{FORCE_RECLAIM_KEY: False})
                         last_gold_state = None
                         gold_start_time = time.time()
