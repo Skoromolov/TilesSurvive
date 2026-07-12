@@ -120,6 +120,7 @@ def main():
     raid_start_time = None
 
     gold_start_time = None
+
     gold_exit_state = None
     gold_exiting = False
 
@@ -193,7 +194,6 @@ def main():
                 if RAID_ENABLED and check_for_raid_button(screen_cv, region):
                     logger.info("[MAIN] Переключение в режим RAID (найдена кнопка рейда)")
                     current_mode = MainMode.RAID
-                    last_gold_state = None
                     raid_start_time = time.time()
                     raid_joined_at_least_once = False
                     last_join_time = time.time()
@@ -231,7 +231,7 @@ def main():
 
                 # 7. Иначе — лечение как дефолтная активность, но сначала собираем книги/почту.
                 if _collect_default_activities(screen_cv, region, window):
-                    time.sleep(1)
+                    # time.sleep(1)
                     continue
 
                 logger.debug("[MAIN] Переключение в режим HEAL (дефолт)")

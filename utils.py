@@ -316,7 +316,6 @@ def scroll_in_region(region, direction, step_ratio=0.3, duration=0.2):
 
 
 def click_top_screen_safe(region, y_ratio=0.12, delay=0.5):
-    """Клик в верхнюю часть экрана без зависимости от gold-контекста."""
     click_x = region[0] + region[2] // 2
     click_y = region[1] + int(region[3] * y_ratio)
     pyautogui.click(click_x, click_y)
@@ -357,7 +356,7 @@ def is_at_main_screen_village(screen_cv, region):
     return False
 
 
-def ensure_exit_to_main_screen(window, region, max_attempts=10):
+def ensure_exit_to_main_screen(window, region, max_attempts=5):
     """
     Пытаться выйти в окно поселения.
     Если бот на карте мира (видна кнопка "в поселение") — нажимаем её.

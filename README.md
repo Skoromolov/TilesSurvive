@@ -45,7 +45,6 @@ pip install numpy opencv-python pyautogui pygetwindow pywin32 pynput
 ├── heal.py                      # Логика лечения и быстрого лечения с карты
 ├── raid.py                      # Логика рейдов
 ├── gold.py                      # Логика золотодобычи
-├── heal_and_raid_backup.txt     # Устаревший монолитный файл (не запускать)
 ├── requirements.txt             # Зависимости
 ├── README.md                    # Этот файл
 ├── docs/                        # Документация

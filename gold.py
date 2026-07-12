@@ -33,6 +33,7 @@ class GoldContext:
     raid_icon_clicks: int = 0
     find_started_at: Optional[float] = None
     find_clicked_at: Optional[float] = None
+    last_action_time: Optional[float] = None
     exit_attempts: int = 0
 
     # persistent поля (синхронизируются с state.py)
@@ -53,6 +54,7 @@ class GoldContext:
         self.main_screen_tries = 0
         self.raid_icon_clicks = 0
         self.find_started_at = None
+        self.last_action_time = None
         self.exit_attempts = 0
 
 
@@ -66,7 +68,7 @@ _gold_ctx = GoldContext(
     force_reclaim=_saved_state.get(FORCE_RECLAIM_KEY, False),
 )
 
-_GOLD_RAPID_POLL = 0.05
+_GOLD_RAPID_POLL = 0.2
 _GOLD_RAPID_CHAIN_TIMEOUT = 6.0
 
 # ==========================================
@@ -88,7 +90,7 @@ def should_do_gold():
         return True
     remaining = int(GOLD_INTERVAL - elapsed)
     m, s = divmod(remaining, 60)
-    logger.debug(f"[GOLD] До рудника: {m:02d}:{s:02d}")
+    logger.info(f"[GOLD] До рудника: {m:02d}:{s:02d}")
     return False
 
 
@@ -176,13 +178,13 @@ def _check_mining_result(screen_after, region):
     """
     if screen_after is None:
         return 'unknown', None
-    return_coords, _ = find_on_screen(get_template(GOLD_RETURN_IMG), screen_after, region)
-    my_rudnik_coords, _ = find_on_screen(get_template(GOLD_MY_RUDNIK_IMG), screen_after, region)
+    return_coords, _ = find_on_screen(get_template(GOLD_RETURN_IMG), screen_after, region, threshold=CONFIDENCE_THRESHOLD)
+    my_rudnik_coords, _ = find_on_screen(get_template(GOLD_MY_RUDNIK_IMG), screen_after, region, threshold=CONFIDENCE_THRESHOLD)
     if return_coords or my_rudnik_coords:
         return 'completed', None
 
     # Окно с кнопкой 'Марш' (GO) имеет приоритет — по нему нужно нажать GO
-    go_coords, _ = find_on_screen(get_template(GOLD_GO_IMG), screen_after, region)
+    go_coords, _ = find_on_screen(get_template(GOLD_GO_IMG), screen_after, region, threshold=CONFIDENCE_THRESHOLD)
     if go_coords:
         return 'go', None
 
@@ -192,7 +194,7 @@ def _check_mining_result(screen_after, region):
     # Если виден GO — переходим к нему. Если остался только summary text — ждём анимацию.
 
     # Если summary text остался, но ни go ни return/my_rudnik не видны — значит анимация ещё идёт
-    summary_coords, _ = find_on_screen(get_template(GOLD_SUMMARY_STRENGTH_TEXT_IMG), screen_after, region)
+    summary_coords, _ = find_on_screen(get_template(GOLD_SUMMARY_STRENGTH_TEXT_IMG), screen_after, region, threshold=CONFIDENCE_THRESHOLD)
     if summary_coords:
         return 'wait', None
 
@@ -215,12 +217,12 @@ def _ensure_target_level(screen_cv, region, window=None, log_prefix="[GOLD]"):
         if attempt < max_attempts:
             # Делаем свежий скриншот между попытками, иначе 3 попытки на одном кадре бесполезны
             if window is not None:
-                time.sleep(GOLD_ACTION_DELAY / 2)
+                time.sleep(GOLD_ACTION_DELAY)
                 current_screen = take_screenshot(window, region)
                 if current_screen is None:
                     current_screen = screen_cv
             else:
-                time.sleep(GOLD_ACTION_DELAY / 2)
+                time.sleep(GOLD_ACTION_DELAY)
 
     if current is not None and current != GOLD_LEVEL:
         logger.info(f"{log_prefix} Уровень {current}, нужен {GOLD_LEVEL}. Открываем выбор уровня.")
@@ -325,7 +327,7 @@ def _rapid_capture_chain(initial_state, screen_cv, region, window):
     while time.time() - chain_start < _GOLD_RAPID_CHAIN_TIMEOUT:
         current_state = determine_gold_state(screen, region)
         if current_state != last_state:
-            logger.debug(f"[GOLD] Быстрая цепочка: {last_state.value} -> {current_state.value}")
+            logger.info(f"[GOLD] Быстрая цепочка: {last_state.value} -> {current_state.value}")
             last_state = current_state
 
         # ---- GO / МАРШ ----
@@ -340,11 +342,12 @@ def _rapid_capture_chain(initial_state, screen_cv, region, window):
                 "[GOLD] Нажимаем 'Марш' (быстрая цепочка).",
                 window, screen, region,
                 post_click_delay=_GOLD_RAPID_POLL,
-                max_attempts=8
+                max_attempts=10
             )
             if result == 'completed':
                 return _complete_mission("[GOLD] ✓ Золотодобыча запущена через 'Марш'!")
             # go/wait/other — перечитаем кадр и продолжим
+            _gold_ctx.last_action_time = time.time()  # обновить таймер от последнего клика
             screen = _fresh_or_current(window, region, screen)
             continue
 
@@ -360,26 +363,28 @@ def _rapid_capture_chain(initial_state, screen_cv, region, window):
 
             # Если одновременно видна кнопка Марш — сразу её
             go_coords, go_conf = find_on_screen(get_template(GOLD_GO_IMG), screen, region)
-            logger.debug(f"[GOLD] SUMMARY/WORK: GO conf={go_conf:.3f} at {go_coords}")
+            logger.info(f"[GOLD] SUMMARY/WORK: GO conf={go_conf:.3f} at {go_coords}")
             if go_coords:
                 result, screen = _click_and_check_completion(
                     GOLD_GO_IMG,
                     "[GOLD] Нажимаем 'Марш' из окна 'Общая сила'.",
                     window, screen, region,
                     post_click_delay=_GOLD_RAPID_POLL,
-                    max_attempts=8
+                    max_attempts=10
                 )
                 if result == 'completed':
                     return _complete_mission("[GOLD] ✓ Золотодобыча запущена через 'Марш'!")
+                _gold_ctx.last_action_time = time.time()  # обновить таймер от последнего клика
                 screen = _fresh_or_current(window, region, screen)
                 continue
 
             work_coords, work_conf = find_on_screen(get_template(GOLD_WORK_IMG), screen, region)
-            logger.debug(f"[GOLD] SUMMARY/WORK: WORK conf={work_conf:.3f} at {work_coords}")
+            logger.info(f"[GOLD] SUMMARY/WORK: WORK conf={work_conf:.3f} at {work_coords}")
             if not work_coords:
                 # Кнопка Добывать ещё не появилась — короткий poll
                 screen = _fresh_or_current(window, region, screen)
-                if time.time() - chain_start > 1.5:
+                action_age = time.time() - (_gold_ctx.last_action_time or chain_start)
+                if action_age > 3.0:
                     logger.info("[GOLD] В окне 'Общая сила' не появилась кнопка 'Добывать'. Закрываем.")
                     return _close_to_rudkin_tab(screen, region, window)
                 continue
@@ -392,8 +397,9 @@ def _rapid_capture_chain(initial_state, screen_cv, region, window):
                 "[GOLD] Нажимаем 'Добывать' (быстрая цепочка).",
                 window, screen, region,
                 post_click_delay=_GOLD_RAPID_POLL,
-                max_attempts=8
+                max_attempts=10
             )
+            _gold_ctx.last_action_time = time.time()  # обновить таймер от последнего клика
             if result == 'completed':
                 _rapid_capture_chain._work_click_attempts = 0
                 return _complete_mission("[GOLD] ✓ Золотодобыча запущена!")
@@ -426,7 +432,7 @@ def _rapid_capture_chain(initial_state, screen_cv, region, window):
                 "[GOLD] Нажимаем свободное место (быстрая цепочка).",
                 window, screen, region,
                 post_click_delay=_GOLD_RAPID_POLL,
-                max_attempts=3
+                max_attempts=10
             )
             if result == 'completed':
                 return _complete_mission("[GOLD] ✓ Золотодобыча запущена!")
@@ -452,7 +458,7 @@ def _rapid_capture_chain(initial_state, screen_cv, region, window):
                 "[GOLD] Нажимаем 'GRIND' (быстрая цепочка).",
                 window, screen, region,
                 post_click_delay=_GOLD_RAPID_POLL,
-                max_attempts=3,
+                max_attempts=10,
             )
             if result == 'completed':
                 return _complete_mission("[GOLD] ✓ Золотодобыча запущена!")
@@ -470,7 +476,7 @@ def _rapid_capture_chain(initial_state, screen_cv, region, window):
     return GoldState.UNKNOWN
 
 
-def _click_and_check_completion(button_img, log_msg, window, screen_cv, region, post_click_delay=None, max_attempts=1):
+def _click_and_check_completion(button_img, log_msg, window, screen_cv, region, post_click_delay=0.1, max_attempts=1):
     """
     Нажать кнопку отправки отряда и проверить результат.
     Возвращает:
@@ -487,12 +493,12 @@ def _click_and_check_completion(button_img, log_msg, window, screen_cv, region, 
     for attempt in range(1, max_attempts + 1):
         screen_after = _take_result_screenshot(window, region, delay=post_click_delay)
         if screen_after is None:
-            logger.debug(f"[GOLD] Попытка {attempt}: не удалось получить скриншот после клика.")
+            logger.info(f"[GOLD] Попытка {attempt}: не удалось получить скриншот после клика.")
             if attempt == max_attempts:
                 return 'other', screen_cv
             continue
         result, _ = _check_mining_result(screen_after, region)
-        logger.debug(f"[GOLD] Попытка {attempt}: результат после клика = {result}")
+        logger.info(f"[GOLD] Попытка {attempt}: результат после клика = {result}")
         if result == 'completed':
             return 'completed', None
         if result == 'go':
@@ -500,12 +506,12 @@ def _click_and_check_completion(button_img, log_msg, window, screen_cv, region, 
         if result == 'wait':
             if attempt == max_attempts:
                 return 'wait', screen_after
-            logger.debug(f"[GOLD] Попытка {attempt}: анимация отправки, ждём ещё.")
+            logger.info(f"[GOLD] Попытка {attempt}: анимация отправки, ждём ещё.")
             continue
         # Если не завершено и не go/wait, возможно появится GO/MARCH позже.
         # Повторяем скриншот до max_attempts.
         if attempt < max_attempts:
-            logger.debug(f"[GOLD] Попытка {attempt}: результат не определён, ждём ещё.")
+            logger.info(f"[GOLD] Попытка {attempt}: результат не определён, ждём ещё.")
     return 'other', screen_after if screen_after is not None else screen_cv
 
 
@@ -575,7 +581,7 @@ def get_current_level(screen_cv, region, threshold=GOLD_LEVEL_CONFIDENCE_THRESHO
             best_conf = conf
             best_level = level
     if best_level:
-        logger.debug(f"[GOLD] Распознан текущий уровень: {best_level} (conf={best_conf:.3f})")
+        logger.info(f"[GOLD] Распознан текущий уровень: {best_level} (conf={best_conf:.3f})")
     return best_level
 
 
@@ -594,7 +600,7 @@ def get_list_level(screen_cv, region, threshold=GOLD_LIST_LEVEL_CONFIDENCE_THRES
             best_level = level
             best_coords = coords
     if best_level:
-        logger.debug(f"[GOLD] В списке найден уровень {best_level} (conf={best_conf:.3f})")
+        logger.info(f"[GOLD] В списке найден уровень {best_level} (conf={best_conf:.3f})")
         return best_level, best_coords
     return None, None
 
@@ -640,7 +646,7 @@ def click_moveon_for_target_level(screen_cv, region, target=GOLD_LEVEL, lvl_thre
     h_lvl, w_lvl = lvl_template.shape[:2]
     lvl_matches = find_all_on_screen(lvl_template, screen_cv, region, lvl_threshold)
     if not lvl_matches:
-        logger.debug(f"[GOLD] lvl_{target}.png не найден на экране.")
+        logger.info(f"[GOLD] lvl_{target}.png не найден на экране.")
         return False
 
     btn_template = get_template(GOLD_MOVEON_IMG)
@@ -659,7 +665,7 @@ def click_moveon_for_target_level(screen_cv, region, target=GOLD_LEVEL, lvl_thre
     if btn_template is None:
         if fallback_click:
             pyautogui.click(*fallback_click)
-            logger.debug(f"[GOLD] Кнопка 'Перейти' отсутствует как шаблон, клик под уровень {target} ({fallback_x:.0f}, {fallback_y:.0f}), conf={conf_lvl:.3f}")
+            logger.info(f"[GOLD] Кнопка 'Перейти' отсутствует как шаблон, клик под уровень {target} ({fallback_x:.0f}, {fallback_y:.0f}), conf={conf_lvl:.3f}")
             return True
         return False
 
@@ -682,7 +688,7 @@ def click_moveon_for_target_level(screen_cv, region, target=GOLD_LEVEL, lvl_thre
                         best_pair = (cx_btn, cy_btn, conf_btn, cx_lvl_i, cy_lvl_i, conf_lvl_i)
 
     if best_pair is None:
-        logger.debug(f"[GOLD] Кнопка 'Перейти' не найдена рядом с уровнем {target}. "
+        logger.info(f"[GOLD] Кнопка 'Перейти' не найдена рядом с уровнем {target}. "
               f"lvl_matches={len(lvl_matches)}, btn_matches={len(btn_matches) if btn_matches else 0}. "
               f"Возможно уровень {target} за пределами экрана — нужен скролл.")
         return False
@@ -693,13 +699,13 @@ def click_moveon_for_target_level(screen_cv, region, target=GOLD_LEVEL, lvl_thre
     if btn_top < region_top + 20 or btn_bottom > region_bottom - 20:
         if fallback_click:
             pyautogui.click(*fallback_click)
-            logger.debug(f"[GOLD] Кнопка 'Перейти' у уровня {target} частично за краем, клик под карточку ({fallback_x:.0f}, {fallback_y:.0f})")
+            logger.info(f"[GOLD] Кнопка 'Перейти' у уровня {target} частично за краем, клик под карточку ({fallback_x:.0f}, {fallback_y:.0f})")
             return True
-        logger.debug(f"[GOLD] Кнопка 'Перейти' у уровня {target} частично за краем экрана. Скроллим.")
+        logger.info(f"[GOLD] Кнопка 'Перейти' у уровня {target} частично за краем экрана. Скроллим.")
         return False
 
     pyautogui.click(cx_btn, cy_btn)
-    logger.debug(f"[GOLD] Нажата 'Перейти' у уровня {target} ({cx_btn:.0f}, {cy_btn:.0f}), conf=({conf_lvl:.3f}/{conf_btn:.3f})")
+    logger.info(f"[GOLD] Нажата 'Перейти' у уровня {target} ({cx_btn:.0f}, {cy_btn:.0f}), conf=({conf_lvl:.3f}/{conf_btn:.3f})")
     return True
 
 
@@ -889,7 +895,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
     current_state = determine_gold_state(screen_cv, region)
 
     if current_state != last_gold_state:
-        logger.debug(f"[GOLD] Состояние: {current_state.value}")
+        logger.info(f"[GOLD] Состояние: {current_state.value}")
         save_debug_screenshot(screen_cv, f"gold_{current_state.value}")
 
     # ---- RETURN BUTTON ----
@@ -1132,7 +1138,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
             return GoldState.UNKNOWN
 
         last_find_click = _gold_ctx.find_clicked_at or 0
-        if time.time() - last_find_click >= 0.5:
+        if time.time() - last_find_click >= 2:
             logger.info(f"[GOLD] Поиск свободного рудника ({int(elapsed_find)} сек)...")
             find_and_click(GOLD_FIND_IMG, screen_cv, region)
             _gold_ctx.find_clicked_at = time.time()
@@ -1276,24 +1282,24 @@ def process_gold(screen_cv, region, last_gold_state, window):
 
     # ---- UNKNOWN / STUCK RECOVERY ----
     if current_state == GoldState.UNKNOWN:
-        logger.debug(f"[GOLD] UNKNOWN recovery start. stuck_count={_gold_ctx.stuck_count}, expected={_gold_ctx.expected}")
+        logger.info(f"[GOLD] UNKNOWN recovery start. stuck_count={_gold_ctx.stuck_count}, expected={_gold_ctx.expected}")
         clicked_at = _gold_ctx.moveon_clicked_at
         if clicked_at and (time.time() - clicked_at) < 2.0:
-            logger.debug("[GOLD] Ожидаем завершения перехода после клика 'Перейти'.")
+            logger.info("[GOLD] Ожидаем завершения перехода после клика 'Перейти'.")
             _gold_ctx.moveon_clicked_at = None
             time.sleep(GOLD_ACTION_DELAY)
             return GoldState.UNKNOWN
 
         clicked_events_at = _gold_ctx.events_clicked_at
-        if clicked_events_at and (time.time() - clicked_events_at) < 4.0:
-            logger.debug("[GOLD] Ожидаем открытия календаря событий.")
+        if clicked_events_at and (time.time() - clicked_events_at) < 3.0:
+            logger.info("[GOLD] Ожидаем открытия календаря событий.")
             time.sleep(GOLD_ACTION_DELAY)
             return GoldState.UNKNOWN
 
         # Если мы недавно открыли события, но оказались в активном событии — свайп по верхней карусели
         if _gold_ctx.expected == 'events' and clicked_events_at \
                 and (time.time() - clicked_events_at) < 5.0:
-            logger.debug("[GOLD] Активное событие открылось вместо календаря. Пробуем свайп по верхней карусели.")
+            logger.info("[GOLD] Активное событие открылось вместо календаря. Пробуем свайп по верхней карусели.")
             swipe_horizontal(region, 'right')
             time.sleep(GOLD_ACTION_DELAY)
             return GoldState.UNKNOWN
@@ -1301,21 +1307,21 @@ def process_gold(screen_cv, region, last_gold_state, window):
         _gold_ctx.stuck_count = _gold_ctx.stuck_count + 1
         action = _gold_ctx.stuck_last_action
         if action != 'back':
-            logger.debug("[GOLD] UNKNOWN recovery: try back")
+            logger.info("[GOLD] UNKNOWN recovery: try back")
             find_and_click(BACK_IMG, screen_cv, region)
             _gold_ctx.stuck_last_action = 'back'
         elif action != 'close':
-            logger.debug("[GOLD] UNKNOWN recovery: try close")
+            logger.info("[GOLD] UNKNOWN recovery: try close")
             find_and_click(GOLD_CLOSE_IMG, screen_cv, region)
             _gold_ctx.stuck_last_action = 'close'
         else:
-            logger.debug("[GOLD] UNKNOWN recovery: try village")
+            logger.info("[GOLD] UNKNOWN recovery: try village")
             find_and_click(VILLAGE_IMG, screen_cv, region)
             _gold_ctx.stuck_last_action = None
             _gold_ctx.stuck_count = 0
 
         time.sleep(GOLD_ACTION_DELAY)
-        logger.debug("[GOLD] UNKNOWN recovery end")
+        logger.info("[GOLD] UNKNOWN recovery end")
         return GoldState.UNKNOWN
 
     return current_state
