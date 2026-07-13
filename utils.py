@@ -315,14 +315,15 @@ def scroll_in_region(region, direction, step_ratio=0.3, duration=0.2):
     logger.info(f"[SCROLL] {direction}: ({cx},{y1}) -> ({cx},{y2})")
 
 
-def click_top_screen_safe(region, y_ratio=0.12, delay=0.5):
+def click_top_screen_safe(region, y_ratio=0.05, delay=0.2):
+    """Клик в верхнюю часть экрана. По умолчанию выше стандартной верхней панели (y=5%)."""
     click_x = region[0] + region[2] // 2
     click_y = region[1] + int(region[3] * y_ratio)
     pyautogui.click(click_x, click_y)
     time.sleep(delay)
 
 
-def click_top_screen_fallback(region, y_ratio=0.12, delay=0.5):
+def click_top_screen_fallback(region, y_ratio=0.05, delay=0.2):
     """Резервный клик в верхнюю часть экрана (алиас для совместимости)."""
     click_top_screen_safe(region, y_ratio=y_ratio, delay=delay)
 
@@ -376,7 +377,7 @@ def ensure_exit_to_main_screen(window, region, max_attempts=5):
             if exit_coords:
                 _, exit_conf = find_on_screen(get_template(EXIT_TO_VILLAGE_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
             logger.info(f"[EXIT] Попытка {attempt}/{max_attempts}: нажимаем 'в поселение' (conf={exit_conf:.3f})")
-            time.sleep(1.0)
+            time.sleep(0.5)
             continue
 
         # На карте мира — нажимаем кнопку "в поселение" (иконка с мячом)
@@ -386,7 +387,7 @@ def ensure_exit_to_main_screen(window, region, max_attempts=5):
             if village_coords:
                 _, village_conf = find_on_screen(get_template(VILLAGE_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
             logger.info(f"[EXIT] Попытка {attempt}/{max_attempts}: нажимаем кнопку 'в поселение' (conf={village_conf:.3f})")
-            time.sleep(1.0)
+            time.sleep(0.5)
             continue
 
         # Явное распознавание карты мира по WILD_EARTH_IMG (дикие земли)
@@ -394,35 +395,37 @@ def ensure_exit_to_main_screen(window, region, max_attempts=5):
         if wild_coords:
             logger.info(f"[EXIT] Попытка {attempt}/{max_attempts}: мы на карте мира (wild_earth conf={wild_conf:.3f}), нажимаем village.png")
             find_and_click(VILLAGE_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
-            time.sleep(1.0)
+            time.sleep(0.5)
             continue
 
         # Закрываем случайные меню / попапы
         logger.info(f"[EXIT] Попытка выхода {attempt}/{max_attempts}: нажимаем back.png")
-        find_and_click(BACK_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
-        time.sleep(1.0)
-        screen_cv = take_screenshot(window, region)
-        if is_at_main_screen_village(screen_cv, region):
-            return True
+        back_clicked, _ = find_and_click(BACK_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+        if back_clicked:
+            time.sleep(0.5)
+            screen_after = take_screenshot(window, region)
+            if is_at_main_screen_village(screen_after, region):
+                return True
 
         logger.info(f"[EXIT] Попытка выхода {attempt}/{max_attempts}: нажимаем close.png")
-        find_and_click(CLOSE_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
-        time.sleep(1.0)
-        screen_cv = take_screenshot(window, region)
-        if is_at_main_screen_village(screen_cv, region):
-            return True
+        close_clicked, _ = find_and_click(CLOSE_IMG, screen_cv if not back_clicked else screen_after, region, threshold=CONFIDENCE_THRESHOLD)
+        if close_clicked:
+            time.sleep(0.5)
+            screen_after = take_screenshot(window, region)
+            if is_at_main_screen_village(screen_after, region):
+                return True
 
-        # Если settlement-маркеры не видны, но back.png продолжает срабатывать
-        # в одном и том же месте (экран магазина/добычи с застрявшей кнопкой),
-        # клик в верхнюю часть экрана закрывает оверлей/детали здания.
-        back_coords, back_conf = find_on_screen(get_template(BACK_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
-        if back_coords:
-            logger.info(f"[EXIT] back.png всё ещё видна (conf={back_conf:.3f}) после закрытия. Клик в верхнюю часть экрана.")
+        # Универсальный защитный клик: если после back/close/в поселение мы всё ещё
+        # не в поселении и не на карте мира — кликаем в верхнюю часть экрана,
+        # чтобы сбросить оверлей/детали здания/попап.
+        screen_check = screen_after if (back_clicked or close_clicked) else screen_cv
+        if not is_at_main_screen_village(screen_check, region):
+            logger.info(f"[EXIT] Стандартные кнопки не вывели в поселение. Клик в верхнюю часть экрана (защитный).")
             try:
                 click_top_screen_safe(region)
             except Exception:
                 click_top_screen_fallback(region)
-            time.sleep(1.0)
+            time.sleep(0.5)
             continue
 
     logger.warning("[EXIT] Не удалось подтвердить выход в окно поселения после всех попыток.")

@@ -24,7 +24,7 @@ FORCE_RAID_ONLY = False   # True = только рейды, False = автопе
 FORCE_ADVENTURE_ONLY = False   # True = только приключения, False = автопереключение
 ADVENTURE_ENABLED = True    # Включить автоматическое переключение в режим приключений
 GOLD_ENABLED = True           # True = включить автоматизацию золотодобычи
-RAID_ENABLED = True           # True = включать автоматическое участие в рейдах, False = отключить рейды
+RAID_ENABLED = False           # True = включать автоматическое участие в рейдах, False = отключить рейды
 
 # ==========================================
 # НАСТРОЙКИ БЫСТРОГО ЛЕЧЕНИЯ С КАРТЫ МИРА
@@ -38,7 +38,7 @@ FAST_HEAL_FROM_MAP_ENABLED = False
 # НАСТРОЙКИ ЗОЛОТОДОБЫЧИ
 # ==========================================
 GOLD_INTERVAL = 2700          # Интервал между успешными золотодобычами (30 минут)
-GOLD_LEVEL = 4               # Уровень рудника 1-6, на котором работаем
+GOLD_LEVEL = 3               # Уровень рудника 1-6, на котором работаем
 # Длительность одной добычи: через сколько секунд отзывать отряд и искать новое место
 GOLD_MINING_DURATION = 2760   # 46 минут — с запасом, т.к. игра не даёт отозвать раньше 45 мин (уровни 5-6)
 GOLD_SEARCH_TIMEOUT = 600     # Таймаут поиска рудника в секундах
@@ -121,6 +121,7 @@ GOLD_FIND_IMG = FOLDER + FOLDER_GOLD + 'find.png'
 GOLD_MY_RUDNIK_IMG = FOLDER + FOLDER_GOLD + 'my_rudnik.png'
 GOLD_RETURN_IMG = FOLDER + FOLDER_GOLD + 'return.png'
 GOLD_RETURN_BOYS_IMG = FOLDER + FOLDER_GOLD + 'return_boys.png'
+GOLD_RETURN_RUDNIK_BUTTON_IMG = FOLDER + FOLDER_GOLD + 'return_rudnik_button.png'
 GOLD_FREE_PLACE_IMG = FOLDER + FOLDER_GOLD + 'free_place.png'
 GOLD_GRIND_IMG = FOLDER + FOLDER_GOLD + 'grind.png'
 GOLD_WORK_IMG = FOLDER + FOLDER_GOLD + 'join.png'
