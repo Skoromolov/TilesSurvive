@@ -12,6 +12,8 @@ from utils import *
 from logger import logger  # Импортируем логгер
 from state import load_state, update_state, LAST_GOLD_TIME_KEY, STARTED_AT_KEY, RECALL_REQUESTED_KEY, FORCE_RECLAIM_KEY
 
+_GOLD_RAPID_POLL = 0.05
+_GOLD_RAPID_CHAIN_TIMEOUT = 10.0
 
 # ==========================================
 # МОДЕЛЬ СОСТОЯНИЯ ЗОЛОТА
@@ -68,8 +70,8 @@ _gold_ctx = GoldContext(
     force_reclaim=_saved_state.get(FORCE_RECLAIM_KEY, False),
 )
 
-_GOLD_RAPID_POLL = 0.05
-_GOLD_RAPID_CHAIN_TIMEOUT = 20.0
+_GOLD_RAPID_POLL = 0.2
+_GOLD_RAPID_CHAIN_TIMEOUT = 6.0
 
 # ==========================================
 # ТАЙМЕР / ПРОВЕРКА ПОРЫ
@@ -158,10 +160,12 @@ def reset_gold_context():
 # ==========================================
 def _complete_mission(log_msg="[GOLD] ✓ Золотодобыча запущена!"):
     """Зафиксировать успешный запуск и вернуть COMPLETED."""
-    _gold_ctx.force_reclaim = False
-    update_state(**{FORCE_RECLAIM_KEY: False})
+    # Сначала записываем таймер, потом лог — чтобы в логе была точная метка,
+    # но главное: если обновление состояния упадёт, мы это заметим до COMPLETED.
     start_gold_mission()
     update_gold_time()
+    _gold_ctx.force_reclaim = False
+    update_state(**{FORCE_RECLAIM_KEY: False})
     logger.info(log_msg)
     return GoldState.COMPLETED
 
@@ -178,6 +182,8 @@ def _check_mining_result(screen_after, region):
     """
     if screen_after is None:
         return 'unknown', None
+
+    # Сначала ищем с основным порогом
     return_coords, _ = find_on_screen(get_template(GOLD_RETURN_IMG), screen_after, region, threshold=CONFIDENCE_THRESHOLD)
     my_rudnik_coords, _ = find_on_screen(get_template(GOLD_MY_RUDNIK_IMG), screen_after, region, threshold=CONFIDENCE_THRESHOLD)
     if return_coords or my_rudnik_coords:
@@ -208,16 +214,21 @@ def _ensure_target_level(screen_cv, region, window=None, log_prefix="[GOLD]"):
     Если целевой — сбросить need_level_check и вернуть None.
     Если уровень не распознан и есть select_level.png — тоже открываем выбор.
     """
-    max_attempts = 1
+    current_screen = screen_cv
+    max_attempts = 3
     for attempt in range(1, max_attempts + 1):
         current = get_current_level(current_screen, region)
         if current is not None:
             break
         if attempt < max_attempts:
+            # Делаем свежий скриншот между попытками, иначе 3 попытки на одном кадре бесполезны
             if window is not None:
-                screen_after = take_screenshot(window, region)
-                if screen_after is not None:
-                    current_screen = screen_after
+                time.sleep(GOLD_ACTION_DELAY)
+                current_screen = take_screenshot(window, region)
+                if current_screen is None:
+                    current_screen = screen_cv
+            else:
+                time.sleep(GOLD_ACTION_DELAY)
 
     if current is not None and current != GOLD_LEVEL:
         logger.info(f"{log_prefix} Уровень {current}, нужен {GOLD_LEVEL}. Открываем выбор уровня.")
@@ -225,6 +236,7 @@ def _ensure_target_level(screen_cv, region, window=None, log_prefix="[GOLD]"):
         find_and_click(GOLD_SELECT_LEVEL_IMG, current_screen, region)
         _gold_ctx.expected = 'level_list'
         _gold_ctx.level_select_scroll_tries = 0
+        time.sleep(GOLD_ACTION_DELAY)
         return GoldState.SELECT_LEVEL_VISIBLE
 
     if current == GOLD_LEVEL:
@@ -240,6 +252,7 @@ def _ensure_target_level(screen_cv, region, window=None, log_prefix="[GOLD]"):
         find_and_click(GOLD_SELECT_LEVEL_IMG, current_screen, region)
         _gold_ctx.expected = 'level_list'
         _gold_ctx.level_select_scroll_tries = 0
+        time.sleep(GOLD_ACTION_DELAY)
         return GoldState.SELECT_LEVEL_VISIBLE
 
     return None
@@ -336,13 +349,36 @@ def _rapid_capture_chain(initial_state, screen_cv, region, window):
                 "[GOLD] Нажимаем 'Марш' (быстрая цепочка).",
                 window, screen, region,
                 post_click_delay=_GOLD_RAPID_POLL,
-                max_attempts=5
+                max_attempts=3
             )
             if result == 'completed':
                 return _complete_mission("[GOLD] ✓ Золотодобыча запущена через 'Марш'!")
-            # go/wait/other — перечитаем кадр и продолжим
-            _gold_ctx.last_action_time = time.time()  # обновить таймер от последнего клика
-            screen = _fresh_or_current(window, region, screen)
+            # После клика GO делаем дополнительные попытки найти признаки активной добычи,
+            # т.к. UI может обновляться с задержкой. Если нашли — completed, иначе продолжаем.
+            confirmed_active = False
+            for attempt in range(1, 8):
+                screen = _fresh_or_current(window, region, screen)
+                if screen is None:
+                    break
+                post_state = determine_gold_state(screen, region)
+                if post_state in (GoldState.MY_RUDNIK_VISIBLE, GoldState.RETURN_BUTTON_VISIBLE, GoldState.RAID_LEVEL_ICON_VISIBLE):
+                    logger.info(f"[GOLD] GO клик обработан: обнаружена активная добыча ({post_state.value}).")
+                    confirmed_active = True
+                    break
+                if post_state == GoldState.GO_VISIBLE:
+                    # GO всё ещё виден — возможно клик не сработал, повторим на следующей итерации
+                    break
+                if post_state == GoldState.WORK_VISIBLE:
+                    # Вернулись к WORK — GO не сработал, повторим
+                    break
+                if post_state != GoldState.UNKNOWN:
+                    logger.info(f"[GOLD] GO клик: неожиданное состояние {post_state.value}, продолжаем цепочку.")
+                    break
+                # UNKNOWN — подождём ещё немного
+                time.sleep(_GOLD_RAPID_POLL)
+            if confirmed_active:
+                return _complete_mission("[GOLD] ✓ Золотодобыча запущена через 'Марш'!")
+            _gold_ctx.last_action_time = time.time()
             continue
 
         # ---- SUMMARY / WORK ----
@@ -364,7 +400,7 @@ def _rapid_capture_chain(initial_state, screen_cv, region, window):
                     "[GOLD] Нажимаем 'Марш' из окна 'Общая сила'.",
                     window, screen, region,
                     post_click_delay=_GOLD_RAPID_POLL,
-                    max_attempts=5
+                    max_attempts=6
                 )
                 if result == 'completed':
                     return _complete_mission("[GOLD] ✓ Золотодобыча запущена через 'Марш'!")
@@ -391,11 +427,21 @@ def _rapid_capture_chain(initial_state, screen_cv, region, window):
                 "[GOLD] Нажимаем 'Добывать' (быстрая цепочка).",
                 window, screen, region,
                 post_click_delay=_GOLD_RAPID_POLL,
-                max_attempts=5
+                max_attempts=10
             )
             _gold_ctx.last_action_time = time.time()  # обновить таймер от последнего клика
             if result == 'completed':
                 _rapid_capture_chain._work_click_attempts = 0
+                # Перед завершением ещё раз убедимся, что реально виден признак активной добычи,
+                # чтобы не стартовать таймер по ложному совпадению.
+                screen = _fresh_or_current(window, region, screen)
+                if screen is not None:
+                    verify_state = determine_gold_state(screen, region)
+                    if verify_state not in (GoldState.MY_RUDNIK_VISIBLE, GoldState.RETURN_BUTTON_VISIBLE, GoldState.RAID_LEVEL_ICON_VISIBLE):
+                        logger.warning(f"[GOLD] WORK вернул completed, но активная добыча не подтверждена ({verify_state.value}). Продолжаем цепочку.")
+                        result = 'other'
+                    else:
+                        logger.info(f"[GOLD] WORK: активная добыча подтверждена ({verify_state.value}).")
                 return _complete_mission("[GOLD] ✓ Золотодобыча запущена!")
             if result == 'go':
                 _rapid_capture_chain._work_click_attempts = 0
@@ -426,7 +472,7 @@ def _rapid_capture_chain(initial_state, screen_cv, region, window):
                 "[GOLD] Нажимаем свободное место (быстрая цепочка).",
                 window, screen, region,
                 post_click_delay=_GOLD_RAPID_POLL,
-                max_attempts=5
+                max_attempts=10
             )
             if result == 'completed':
                 return _complete_mission("[GOLD] ✓ Золотодобыча запущена!")
@@ -452,7 +498,7 @@ def _rapid_capture_chain(initial_state, screen_cv, region, window):
                 "[GOLD] Нажимаем 'GRIND' (быстрая цепочка).",
                 window, screen, region,
                 post_click_delay=_GOLD_RAPID_POLL,
-                max_attempts=5,
+                max_attempts=10,
             )
             if result == 'completed':
                 return _complete_mission("[GOLD] ✓ Золотодобыча запущена!")
@@ -470,7 +516,7 @@ def _rapid_capture_chain(initial_state, screen_cv, region, window):
     return GoldState.UNKNOWN
 
 
-def _click_and_check_completion(button_img, log_msg, window, screen_cv, region, post_click_delay=0.1, max_attempts=1):
+def _click_and_check_completion(button_img, log_msg, window, screen_cv, region, post_click_delay=0.05, max_attempts=3):
     """
     Нажать кнопку отправки отряда и проверить результат.
     Возвращает:
@@ -487,25 +533,21 @@ def _click_and_check_completion(button_img, log_msg, window, screen_cv, region, 
     for attempt in range(1, max_attempts + 1):
         screen_after = _take_result_screenshot(window, region, delay=post_click_delay)
         if screen_after is None:
-            logger.info(f"[GOLD] Попытка {attempt}: не удалось получить скриншот после клика.")
             if attempt == max_attempts:
                 return 'other', screen_cv
             continue
         result, _ = _check_mining_result(screen_after, region)
-        logger.info(f"[GOLD] Попытка {attempt}: результат после клика = {result}")
-        if result == 'completed':
-            return 'completed', None
-        if result == 'go':
-            return 'go', screen_after
-        if result == 'wait':
-            if attempt == max_attempts:
-                return 'wait', screen_after
-            logger.info(f"[GOLD] Попытка {attempt}: анимация отправки, ждём ещё.")
-            continue
-        # Если не завершено и не go/wait, возможно появится GO/MARCH позже.
-        # Повторяем скриншот до max_attempts.
-        if attempt < max_attempts:
-            logger.info(f"[GOLD] Попытка {attempt}: результат не определён, ждём ещё.")
+        if result != 'unknown':
+            logger.info(f"[GOLD] Попытка {attempt}: результат после клика = {result}")
+            if result == 'completed':
+                return 'completed', None
+            if result == 'go':
+                return 'go', screen_after
+            if result == 'wait':
+                if attempt == max_attempts:
+                    return 'wait', screen_after
+                continue
+            return 'other', screen_after
     return 'other', screen_after if screen_after is not None else screen_cv
 
 
@@ -515,24 +557,37 @@ def _try_recall(screen_cv, region, window=None):
     """Попытаться отозвать активный отряд, если recall_requested.
     Возвращает новое GoldState или None, если recall не требуется.
     """
-    return_coords, _ = find_on_screen(get_template(GOLD_RETURN_IMG), screen_cv, region)
+    # return.png должен быть в нижней части экрана (кнопка отзыва),
+    # чтобы не путать с иконками верхней панели/событий.
+    return_coords, return_conf = find_on_screen(get_template(GOLD_RETURN_IMG), screen_cv, region)
     if return_coords:
-        logger.info("[GOLD] Отряд занят добычей. Отзываем.")
+        logger.info(f"[GOLD] Отряд занят добычей. Отзываем (return.png conf={return_conf:.3f}).")
         find_and_click(GOLD_RETURN_IMG, screen_cv, region)
         return GoldState.RETURN_CONFIRM_VISIBLE
 
-    my_rudnik_coords, _ = find_on_screen(get_template(GOLD_MY_RUDNIK_IMG), screen_cv, region)
+    # Если уже открыты детали рудника — кнопка отзыва внутри попапа
+    return_rudnik_coords, return_rudnik_conf = find_on_screen(get_template(GOLD_RETURN_RUDNIK_BUTTON_IMG), screen_cv, region)
+    if return_rudnik_coords:
+        logger.info(f"[GOLD] Отряд занят добычей. Отзываем через кнопку деталей рудника (conf={return_rudnik_conf:.3f}).")
+        find_and_click(GOLD_RETURN_RUDNIK_BUTTON_IMG, screen_cv, region)
+        return GoldState.RETURN_CONFIRM_VISIBLE
+
+    # Fallback: открыть детали рудника через my_rudnik.png, если она в нижней части
+    my_rudnik_coords, my_rudnik_conf = find_on_screen(get_template(GOLD_MY_RUDNIK_IMG), screen_cv, region)
     if my_rudnik_coords:
-        logger.info("[GOLD] Открываем детали рудника (my_rudnik.png) для отзыва.")
+        logger.info(f"[GOLD] Открываем детали рудника (my_rudnik.png conf={my_rudnik_conf:.3f}) для отзыва.")
         find_and_click(GOLD_MY_RUDNIK_IMG, screen_cv, region)
+        time.sleep(_GOLD_RAPID_POLL)
         return GoldState.UNKNOWN
 
-    logger.info("[GOLD] recall_requested, но не видно ни return.png, ни my_rudnik.png. Ждём.")
+    logger.info("[GOLD] recall_requested, но не видно корректной кнопки отзыва. Ждём.")
     return GoldState.UNKNOWN
 
 def _close_to_rudkin_tab(screen_cv, region, window):
     """Закрыть попап и вернуться к rudnik_tab."""
     find_and_click(GOLD_CLOSE_IMG, screen_cv, region)
+
+    time.sleep(GOLD_ACTION_DELAY)
     # Verify we are back at rudnik_tab by checking for find or select_level
     screen_after = take_screenshot(window, region)
     if screen_after is None:
@@ -595,10 +650,8 @@ def get_list_level(screen_cv, region, threshold=GOLD_LIST_LEVEL_CONFIDENCE_THRES
     return None, None
 
 
-def is_target_level_in_list(screen_cv, region, target=GOLD_LEVEL, threshold=None):
+def is_target_level_in_list(screen_cv, region, target=GOLD_LEVEL, threshold=GOLD_LIST_LEVEL_CONFIDENCE_THRESHOLD):
     """Проверить, виден ли целевой уровень в списке."""
-    if threshold is None:
-        threshold = GOLD_LIST_LEVEL_CONFIDENCE_THRESHOLD
     lvl_template = get_template(GOLD_LEVEL_IMAGES[target])
     if lvl_template is None:
         return False
@@ -886,7 +939,14 @@ def process_gold(screen_cv, region, last_gold_state, window):
 
     if current_state != last_gold_state:
         logger.info(f"[GOLD] Состояние: {current_state.value}")
-        save_debug_screenshot(screen_cv, f"gold_{current_state.value}")
+        # Сохраняем скриншот только при критических переходах — не на каждую смену
+        critical_transitions = (
+            GoldState.RETURN_CONFIRM_VISIBLE, GoldState.FINISH_VISIBLE,
+            GoldState.FREE_PLACE_VISIBLE, GoldState.COMPLETED,
+            GoldState.FORWARD_POPUP_VISIBLE,
+        )
+        if current_state in critical_transitions or last_gold_state == GoldState.UNKNOWN:
+            save_debug_screenshot(screen_cv, f"gold_{current_state.value}")
 
     # ---- RETURN BUTTON ----
     if current_state == GoldState.RETURN_BUTTON_VISIBLE:
@@ -899,12 +959,16 @@ def process_gold(screen_cv, region, last_gold_state, window):
 
     # ---- RETURN CONFIRM ----
     if current_state == GoldState.RETURN_CONFIRM_VISIBLE:
-        find_and_click(GOLD_RETURN_BOYS_IMG, screen_cv, region)
+        clicked, _ = find_and_click(GOLD_RETURN_BOYS_IMG, screen_cv, region)
+        if not clicked:
+            logger.warning("[GOLD] Кнопка подтверждения отзыва не найдена, пробуем fallback confirm.png")
+            find_and_click(GOLD_CONFIRM_IMG, screen_cv, region)
         clear_gold_mission()
+        _gold_ctx.recall_requested = False
         _gold_ctx.expected = 'rudnik_tab'
         _gold_ctx.need_level_check = True
         _gold_ctx.force_reclaim = True
-        update_state(**{FORCE_RECLAIM_KEY: True})
+        update_state(**{FORCE_RECLAIM_KEY: True, RECALL_REQUESTED_KEY: False})
         logger.info("[GOLD] Отряд отозван.")
         return GoldState.RUDNIK_TAB
 
@@ -946,19 +1010,21 @@ def process_gold(screen_cv, region, last_gold_state, window):
 
     # ---- CONFIRM BUTTON ----
     if current_state == GoldState.CONFIRM_VISIBLE:
-        # Если бот пытался отозвать отряд, а игра показала попап "СОВЕТ" с
-        # текстом "Чтобы отозвать отряд, необходимо добывать ... в течение 45 мин",
-        # подтверждаем его и выходим в HEAL. Отряд ещё не может быть отозван.
         if _gold_ctx.recall_requested:
             logger.info("[GOLD] Подтверждаем попап 'СОВЕТ' (отзыв пока невозможен).")
             find_and_click(GOLD_CONFIRM_IMG, screen_cv, region)
-            # Возвращаемся в main, не сбрасывая last_gold_time — отряд продолжает добыву,
-            # и через реальные 45 минут с момента старта бот снова попробует отозвать.
-            return GoldState.COMPLETED
+            # Не выходим из GOLD — остаёмся на руднике, чтобы сразу перезанять место.
+            _gold_ctx.recall_requested = False
+            _gold_ctx.force_reclaim = True
+            _gold_ctx.expected = 'rudnik_tab'
+            _gold_ctx.need_level_check = True
+            update_state(**{RECALL_REQUESTED_KEY: False, FORCE_RECLAIM_KEY: True})
+            return GoldState.RUDNIK_TAB
         logger.info("[GOLD] Нажимаем 'Подтвердить'.")
         find_and_click(GOLD_CONFIRM_IMG, screen_cv, region)
         _gold_ctx.need_level_check = True
         return GoldState.RUDNIK_TAB
+
     # ---- SUMMARY / WORK / GO / GRIND ----
     if current_state in (GoldState.SUMMARY_STRENGTH_TEXT_VISIBLE, GoldState.WORK_VISIBLE,
                          GoldState.GO_VISIBLE, GoldState.GRIND_VISIBLE):
@@ -1026,7 +1092,14 @@ def process_gold(screen_cv, region, last_gold_state, window):
         _gold_ctx.raid_icon_clicks = 0
         _gold_ctx.find_started_at = None  # сброс таймаута поиска
 
-        level_state = _ensure_target_level(screen_cv, region, window=window)
+        level_state = None
+
+        # Early-exit: если уровень уже проверен и совпадает с GOLD_LEVEL — пропускаем 3-pass scan
+        if not _gold_ctx.need_level_check and _gold_ctx.current_mining_level == GOLD_LEVEL:
+            _gold_ctx.need_level_check = False
+        else:
+            level_state = _ensure_target_level(screen_cv, region, window=window)
+
         if level_state is not None:
             return level_state
 
@@ -1076,6 +1149,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
                 # Уровень только что выбран явно — повторная проверка не нужна,
                 # иначе нераспознанный current_lvl_X снова откроет этот список.
                 _gold_ctx.need_level_check = False
+                time.sleep(GOLD_ACTION_DELAY)  # Ждём загрузки табы рудника после "Перейти"
                 return GoldState.RUDNIK_TAB
             # Кнопка "Перейти" не найдена рядом с уровнем — скроллим чтобы уровкть кнопку
             logger.info(f"[GOLD] Уровень {GOLD_LEVEL} виден, но кнопка 'Перейти' не найдена. Скроллим.")
@@ -1109,6 +1183,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
         find_and_click(GOLD_SELECT_LEVEL_IMG, screen_cv, region)
         _gold_ctx.expected = 'level_list'
         _gold_ctx.level_select_scroll_tries = 0
+        time.sleep(GOLD_ACTION_DELAY)
         return GoldState.SELECT_LEVEL_VISIBLE
 
     # ---- FIND (поиск свободного рудника) ----
@@ -1126,7 +1201,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
             return GoldState.UNKNOWN
 
         last_find_click = _gold_ctx.find_clicked_at or 0
-        if time.time() - last_find_click >= 2:
+        if time.time() - last_find_click >= 0.5:
             logger.info(f"[GOLD] Поиск свободного рудника ({int(elapsed_find)} сек)...")
             find_and_click(GOLD_FIND_IMG, screen_cv, region)
             _gold_ctx.find_clicked_at = time.time()
@@ -1142,6 +1217,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
         if clicked:
             logger.info(f"[GOLD] Нажимаем на строку события золотодобычи.")
             # pyautogui.click(click_x, click_y)
+            time.sleep(GOLD_ACTION_DELAY)
             # Проверяем, открылся ли попап с кнопкой 'Вперёд', на свежем скриншоте
             screen_after = take_screenshot(window, region)
             if screen_after is not None:
@@ -1150,6 +1226,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
                     logger.info(f"[GOLD] Попап 'Вперёд' открылся")
                     return GoldState.FORWARD_POPUP_VISIBLE
                 logger.info("[GOLD] Попап 'Вперёд' не открылся после первого клика, пробуем ещё раз.")
+                time.sleep(GOLD_ACTION_DELAY)
             logger.info("[GOLD] Не удалось открыть попап события, продолжаем искать/скроллить.")
             return GoldState.EVENTS_NEED_SCROLL
         return GoldState.EVENTS_MENU_OPEN
@@ -1162,6 +1239,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
         clicked, _ = find_and_click(GOLD_FORWARD_IMG, screen_now, region, threshold=0.55)
         if clicked:
             logger.info("[GOLD] Нажали 'Вперёд'. Ждём открытия табы рудника.")
+            time.sleep(GOLD_ACTION_DELAY)
             return GoldState.RUDNIK_TAB
         logger.info("[GOLD] Кнопка 'Вперёд' не найдена, пробуем закрыть попап.")
         find_and_click(GOLD_CLOSE_IMG, screen_now, region)
@@ -1191,6 +1269,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
             if rudnik_rel_y < 0.30 and not calendar_opened_coords:
                 logger.info(f"[GOLD] Открыто активное событие, переключаемся на вкладку рудника (rudnik.png conf={rudnik_conf:.3f}).")
                 pyautogui.click(rudnik_coords[0], rudnik_coords[1])
+                time.sleep(GOLD_ACTION_DELAY)
                 return GoldState.EVENTS_MENU_OPEN
 
         # Сначала проверим, не появилась ли иконка золотодобычи после предыдущего свайпа
@@ -1206,6 +1285,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
             if calendar_coords:
                 logger.info("[GOLD] Нажимаем calendar.png чтобы открыть календарь событий.")
                 find_and_click(CALENDAR_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+                time.sleep(GOLD_ACTION_DELAY)
                 return GoldState.EVENTS_MENU_OPEN
             # calendar.png не найден — пробуем свайпать
             logger.info("[GOLD] calendar.png не найден, пробуем свайпать для поиска.")
@@ -1246,12 +1326,8 @@ def process_gold(screen_cv, region, last_gold_state, window):
             _click_top_screen(region, reset_main_tries=True)
             return GoldState.UNKNOWN
 
-        # Если застряли на main_screen > 3 попыток — клик в верхнюю часть экрана
-        if _gold_ctx.main_screen_tries > 3:
-            logger.info(f"[GOLD] Застряли на main_screen ({_gold_ctx.main_screen_tries} попыток). Клик в верхнюю часть экрана.")
-            _click_top_screen(region, reset_main_tries=True)
-            return GoldState.UNKNOWN
-
+        # Застревание на main_screen решается только через events.png / calendar.png.
+        # Универсальный клик вверх больше не используется здесь — он попадает в магазин/события.
         clicked, _ = find_and_click(EVENTS_IMG, screen_cv, region)
         if not clicked:
             # Если events.png не найден — пробуем calendar.png (иконка календаря в меню событий)
@@ -1259,6 +1335,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
             find_and_click(CALENDAR_IMG, screen_cv, region)
         _gold_ctx.swipe_count = 0
         _gold_ctx.events_clicked_at = time.time()
+        time.sleep(GOLD_ACTION_DELAY)
         _gold_ctx.expected = 'events'
         return GoldState.EVENTS_MENU_OPEN
 
@@ -1269,11 +1346,13 @@ def process_gold(screen_cv, region, last_gold_state, window):
         if clicked_at and (time.time() - clicked_at) < 2.0:
             logger.info("[GOLD] Ожидаем завершения перехода после клика 'Перейти'.")
             _gold_ctx.moveon_clicked_at = None
+            time.sleep(GOLD_ACTION_DELAY)
             return GoldState.UNKNOWN
 
         clicked_events_at = _gold_ctx.events_clicked_at
         if clicked_events_at and (time.time() - clicked_events_at) < 3.0:
             logger.info("[GOLD] Ожидаем открытия календаря событий.")
+            time.sleep(GOLD_ACTION_DELAY)
             return GoldState.UNKNOWN
 
         # Если мы недавно открыли события, но оказались в активном событии — свайп по верхней карусели
@@ -1281,7 +1360,17 @@ def process_gold(screen_cv, region, last_gold_state, window):
                 and (time.time() - clicked_events_at) < 5.0:
             logger.info("[GOLD] Активное событие открылось вместо календаря. Пробуем свайп по верхней карусели.")
             swipe_horizontal(region, 'right')
+            time.sleep(GOLD_ACTION_DELAY)
             return GoldState.UNKNOWN
+
+        # Если мы в процессе поиска/захвата рудника — back/close только мешают,
+        # закрывая экран поиска. Вместо этого делаем свежий скриншот и определяем состояние.
+        # if _gold_ctx.expected in ('find', 'rudnik_tab'):
+            # logger.info("[GOLD] UNKNOWN в контексте поиска рудника: пропускаем recovery back/close, ждём свежий кадр.")
+            # _gold_ctx.stuck_count = 0
+            # _gold_ctx.stuck_last_action = None
+            # time.sleep(_GOLD_RAPID_POLL)
+            # return GoldState.UNKNOWN
 
         _gold_ctx.stuck_count = _gold_ctx.stuck_count + 1
         action = _gold_ctx.stuck_last_action
@@ -1299,6 +1388,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
             _gold_ctx.stuck_last_action = None
             _gold_ctx.stuck_count = 0
 
+        time.sleep(GOLD_ACTION_DELAY)
         logger.info("[GOLD] UNKNOWN recovery end")
         return GoldState.UNKNOWN
 

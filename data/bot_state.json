@@ -1,6 +1,6 @@
 {
-  "gold_started_at": 1783871793.8122096,
-  "last_gold_time": 1783871793.8129437,
+  "gold_started_at": null,
+  "last_gold_time": 1783961853.6175146,
   "gold_recall_requested": false,
-  "gold_force_reclaim": false
+  "gold_force_reclaim": true
 }
