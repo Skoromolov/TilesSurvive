@@ -82,7 +82,7 @@ def _collect_default_activities(screen_cv, region, window):
     if found:
         logger.info("[DEFAULT] ✓ MAIL нажато, ждём попап подтверждения.")
         collected = True
-        time.sleep(1)
+        time.sleep(0.3)
         if window is not None:
             screen_cv = take_screenshot(window, region)
         find_and_click(CONFIRM_BUTTON_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
@@ -353,7 +353,7 @@ def main():
             if current_mode == MainMode.GOLD:
                 time.sleep(GOLD_LOOP_DELAY)
             else:
-                time.sleep(1)
+                time.sleep(0.3)
 
         except Exception as e:
             logger.error(f"[ОШИБКА] {e}", exc_info=True)

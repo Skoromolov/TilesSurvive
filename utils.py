@@ -278,7 +278,7 @@ def find_all_on_screen(template, screen_cv, region, threshold=CONFIDENCE_THRESHO
     return filtered
 
 
-def swipe_horizontal(region, direction="right", duration=0.5, y_offset=80):
+def swipe_horizontal(region, direction="right", duration=0.2, y_offset=80):
     """
     Горизонтальный свайп в верхней части окна BlueStacks.
     direction: 'right' или 'left'.
@@ -296,7 +296,7 @@ def swipe_horizontal(region, direction="right", duration=0.5, y_offset=80):
     logger.info(f"[SWIPE] {direction}: ({x1},{y}) -> ({x2},{y})")
 
 
-def scroll_in_region(region, direction, step_ratio=0.3, duration=0.2):
+def scroll_in_region(region, direction, step_ratio=0.3, duration=0.15):
     """
     Вертикальный скролл (drag) в центре окна.
     direction: 'down' или 'up'.
@@ -315,14 +315,14 @@ def scroll_in_region(region, direction, step_ratio=0.3, duration=0.2):
     logger.info(f"[SCROLL] {direction}: ({cx},{y1}) -> ({cx},{y2})")
 
 
-def click_top_screen_safe(region, y_ratio=0.12, delay=0.5):
+def click_top_screen_safe(region, y_ratio=0.12, delay=0.2):
     click_x = region[0] + region[2] // 2
     click_y = region[1] + int(region[3] * y_ratio)
     pyautogui.click(click_x, click_y)
     time.sleep(delay)
 
 
-def click_top_screen_fallback(region, y_ratio=0.12, delay=0.5):
+def click_top_screen_fallback(region, y_ratio=0.12, delay=0.2):
     """Резервный клик в верхнюю часть экрана (алиас для совместимости)."""
     click_top_screen_safe(region, y_ratio=y_ratio, delay=delay)
 
@@ -376,7 +376,7 @@ def ensure_exit_to_main_screen(window, region, max_attempts=5):
             if exit_coords:
                 _, exit_conf = find_on_screen(get_template(EXIT_TO_VILLAGE_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
             logger.info(f"[EXIT] Попытка {attempt}/{max_attempts}: нажимаем 'в поселение' (conf={exit_conf:.3f})")
-            time.sleep(1.0)
+            time.sleep(0.3)
             continue
 
         # На карте мира — нажимаем кнопку "в поселение" (иконка с мячом)
@@ -386,7 +386,7 @@ def ensure_exit_to_main_screen(window, region, max_attempts=5):
             if village_coords:
                 _, village_conf = find_on_screen(get_template(VILLAGE_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
             logger.info(f"[EXIT] Попытка {attempt}/{max_attempts}: нажимаем кнопку 'в поселение' (conf={village_conf:.3f})")
-            time.sleep(1.0)
+            time.sleep(0.3)
             continue
 
         # Явное распознавание карты мира по WILD_EARTH_IMG (дикие земли)
@@ -394,20 +394,20 @@ def ensure_exit_to_main_screen(window, region, max_attempts=5):
         if wild_coords:
             logger.info(f"[EXIT] Попытка {attempt}/{max_attempts}: мы на карте мира (wild_earth conf={wild_conf:.3f}), нажимаем village.png")
             find_and_click(VILLAGE_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
-            time.sleep(1.0)
+            time.sleep(0.3)
             continue
 
         # Закрываем случайные меню / попапы
         logger.info(f"[EXIT] Попытка выхода {attempt}/{max_attempts}: нажимаем back.png")
         find_and_click(BACK_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
-        time.sleep(1.0)
+        time.sleep(0.3)
         screen_cv = take_screenshot(window, region)
         if is_at_main_screen_village(screen_cv, region):
             return True
 
         logger.info(f"[EXIT] Попытка выхода {attempt}/{max_attempts}: нажимаем close.png")
         find_and_click(CLOSE_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
-        time.sleep(1.0)
+        time.sleep(0.3)
         screen_cv = take_screenshot(window, region)
         if is_at_main_screen_village(screen_cv, region):
             return True
@@ -422,7 +422,7 @@ def ensure_exit_to_main_screen(window, region, max_attempts=5):
                 click_top_screen_safe(region)
             except Exception:
                 click_top_screen_fallback(region)
-            time.sleep(1.0)
+            time.sleep(0.3)
             continue
 
     logger.warning("[EXIT] Не удалось подтвердить выход в окно поселения после всех попыток.")

@@ -68,8 +68,8 @@ _gold_ctx = GoldContext(
     force_reclaim=_saved_state.get(FORCE_RECLAIM_KEY, False),
 )
 
-_GOLD_RAPID_POLL = 0.2
-_GOLD_RAPID_CHAIN_TIMEOUT = 6.0
+_GOLD_RAPID_POLL = 0.05
+_GOLD_RAPID_CHAIN_TIMEOUT = 20.0
 
 # ==========================================
 # ТАЙМЕР / ПРОВЕРКА ПОРЫ
@@ -208,21 +208,16 @@ def _ensure_target_level(screen_cv, region, window=None, log_prefix="[GOLD]"):
     Если целевой — сбросить need_level_check и вернуть None.
     Если уровень не распознан и есть select_level.png — тоже открываем выбор.
     """
-    current_screen = screen_cv
-    max_attempts = 3
+    max_attempts = 1
     for attempt in range(1, max_attempts + 1):
         current = get_current_level(current_screen, region)
         if current is not None:
             break
         if attempt < max_attempts:
-            # Делаем свежий скриншот между попытками, иначе 3 попытки на одном кадре бесполезны
             if window is not None:
-                time.sleep(GOLD_ACTION_DELAY)
-                current_screen = take_screenshot(window, region)
-                if current_screen is None:
-                    current_screen = screen_cv
-            else:
-                time.sleep(GOLD_ACTION_DELAY)
+                screen_after = take_screenshot(window, region)
+                if screen_after is not None:
+                    current_screen = screen_after
 
     if current is not None and current != GOLD_LEVEL:
         logger.info(f"{log_prefix} Уровень {current}, нужен {GOLD_LEVEL}. Открываем выбор уровня.")
@@ -230,7 +225,6 @@ def _ensure_target_level(screen_cv, region, window=None, log_prefix="[GOLD]"):
         find_and_click(GOLD_SELECT_LEVEL_IMG, current_screen, region)
         _gold_ctx.expected = 'level_list'
         _gold_ctx.level_select_scroll_tries = 0
-        time.sleep(GOLD_ACTION_DELAY)
         return GoldState.SELECT_LEVEL_VISIBLE
 
     if current == GOLD_LEVEL:
@@ -246,7 +240,6 @@ def _ensure_target_level(screen_cv, region, window=None, log_prefix="[GOLD]"):
         find_and_click(GOLD_SELECT_LEVEL_IMG, current_screen, region)
         _gold_ctx.expected = 'level_list'
         _gold_ctx.level_select_scroll_tries = 0
-        time.sleep(GOLD_ACTION_DELAY)
         return GoldState.SELECT_LEVEL_VISIBLE
 
     return None
@@ -299,10 +292,11 @@ def _check_recall_needed():
 
 
 def _take_result_screenshot(window, region, delay=None):
-    """Сделать скриншот после клика и подождать GOLD_ACTION_DELAY."""
+    """Сделать скриншот после клика и подождать минимальное время."""
     if delay is None:
-        delay = GOLD_ACTION_DELAY
-    time.sleep(delay)
+        delay = _GOLD_RAPID_POLL
+    if delay > 0:
+        time.sleep(delay)
     screen_after = take_screenshot(window, region)
     return screen_after
 
@@ -342,7 +336,7 @@ def _rapid_capture_chain(initial_state, screen_cv, region, window):
                 "[GOLD] Нажимаем 'Марш' (быстрая цепочка).",
                 window, screen, region,
                 post_click_delay=_GOLD_RAPID_POLL,
-                max_attempts=10
+                max_attempts=5
             )
             if result == 'completed':
                 return _complete_mission("[GOLD] ✓ Золотодобыча запущена через 'Марш'!")
@@ -370,7 +364,7 @@ def _rapid_capture_chain(initial_state, screen_cv, region, window):
                     "[GOLD] Нажимаем 'Марш' из окна 'Общая сила'.",
                     window, screen, region,
                     post_click_delay=_GOLD_RAPID_POLL,
-                    max_attempts=10
+                    max_attempts=5
                 )
                 if result == 'completed':
                     return _complete_mission("[GOLD] ✓ Золотодобыча запущена через 'Марш'!")
@@ -397,7 +391,7 @@ def _rapid_capture_chain(initial_state, screen_cv, region, window):
                 "[GOLD] Нажимаем 'Добывать' (быстрая цепочка).",
                 window, screen, region,
                 post_click_delay=_GOLD_RAPID_POLL,
-                max_attempts=10
+                max_attempts=5
             )
             _gold_ctx.last_action_time = time.time()  # обновить таймер от последнего клика
             if result == 'completed':
@@ -432,7 +426,7 @@ def _rapid_capture_chain(initial_state, screen_cv, region, window):
                 "[GOLD] Нажимаем свободное место (быстрая цепочка).",
                 window, screen, region,
                 post_click_delay=_GOLD_RAPID_POLL,
-                max_attempts=10
+                max_attempts=5
             )
             if result == 'completed':
                 return _complete_mission("[GOLD] ✓ Золотодобыча запущена!")
@@ -458,7 +452,7 @@ def _rapid_capture_chain(initial_state, screen_cv, region, window):
                 "[GOLD] Нажимаем 'GRIND' (быстрая цепочка).",
                 window, screen, region,
                 post_click_delay=_GOLD_RAPID_POLL,
-                max_attempts=10,
+                max_attempts=5,
             )
             if result == 'completed':
                 return _complete_mission("[GOLD] ✓ Золотодобыча запущена!")
@@ -531,18 +525,14 @@ def _try_recall(screen_cv, region, window=None):
     if my_rudnik_coords:
         logger.info("[GOLD] Открываем детали рудника (my_rudnik.png) для отзыва.")
         find_and_click(GOLD_MY_RUDNIK_IMG, screen_cv, region)
-        time.sleep(GOLD_ACTION_DELAY)
         return GoldState.UNKNOWN
 
     logger.info("[GOLD] recall_requested, но не видно ни return.png, ни my_rudnik.png. Ждём.")
-    time.sleep(GOLD_ACTION_DELAY)
     return GoldState.UNKNOWN
 
 def _close_to_rudkin_tab(screen_cv, region, window):
     """Закрыть попап и вернуться к rudnik_tab."""
     find_and_click(GOLD_CLOSE_IMG, screen_cv, region)
-
-    time.sleep(GOLD_ACTION_DELAY)
     # Verify we are back at rudnik_tab by checking for find or select_level
     screen_after = take_screenshot(window, region)
     if screen_after is None:
@@ -1086,7 +1076,6 @@ def process_gold(screen_cv, region, last_gold_state, window):
                 # Уровень только что выбран явно — повторная проверка не нужна,
                 # иначе нераспознанный current_lvl_X снова откроет этот список.
                 _gold_ctx.need_level_check = False
-                time.sleep(GOLD_ACTION_DELAY)  # Ждём загрузки табы рудника после "Перейти"
                 return GoldState.RUDNIK_TAB
             # Кнопка "Перейти" не найдена рядом с уровнем — скроллим чтобы уровкть кнопку
             logger.info(f"[GOLD] Уровень {GOLD_LEVEL} виден, но кнопка 'Перейти' не найдена. Скроллим.")
@@ -1120,7 +1109,6 @@ def process_gold(screen_cv, region, last_gold_state, window):
         find_and_click(GOLD_SELECT_LEVEL_IMG, screen_cv, region)
         _gold_ctx.expected = 'level_list'
         _gold_ctx.level_select_scroll_tries = 0
-        time.sleep(GOLD_ACTION_DELAY)
         return GoldState.SELECT_LEVEL_VISIBLE
 
     # ---- FIND (поиск свободного рудника) ----
@@ -1143,7 +1131,7 @@ def process_gold(screen_cv, region, last_gold_state, window):
             find_and_click(GOLD_FIND_IMG, screen_cv, region)
             _gold_ctx.find_clicked_at = time.time()
         else:
-            time.sleep(GOLD_ACTION_DELAY)
+            time.sleep(_GOLD_RAPID_POLL)
         return GoldState.FIND_VISIBLE
 
     # ---- EVENTS: RUDNIK VISIBLE ----
@@ -1154,7 +1142,6 @@ def process_gold(screen_cv, region, last_gold_state, window):
         if clicked:
             logger.info(f"[GOLD] Нажимаем на строку события золотодобычи.")
             # pyautogui.click(click_x, click_y)
-            time.sleep(GOLD_ACTION_DELAY)
             # Проверяем, открылся ли попап с кнопкой 'Вперёд', на свежем скриншоте
             screen_after = take_screenshot(window, region)
             if screen_after is not None:
@@ -1163,7 +1150,6 @@ def process_gold(screen_cv, region, last_gold_state, window):
                     logger.info(f"[GOLD] Попап 'Вперёд' открылся")
                     return GoldState.FORWARD_POPUP_VISIBLE
                 logger.info("[GOLD] Попап 'Вперёд' не открылся после первого клика, пробуем ещё раз.")
-                time.sleep(GOLD_ACTION_DELAY)
             logger.info("[GOLD] Не удалось открыть попап события, продолжаем искать/скроллить.")
             return GoldState.EVENTS_NEED_SCROLL
         return GoldState.EVENTS_MENU_OPEN
@@ -1176,7 +1162,6 @@ def process_gold(screen_cv, region, last_gold_state, window):
         clicked, _ = find_and_click(GOLD_FORWARD_IMG, screen_now, region, threshold=0.55)
         if clicked:
             logger.info("[GOLD] Нажали 'Вперёд'. Ждём открытия табы рудника.")
-            time.sleep(GOLD_ACTION_DELAY)
             return GoldState.RUDNIK_TAB
         logger.info("[GOLD] Кнопка 'Вперёд' не найдена, пробуем закрыть попап.")
         find_and_click(GOLD_CLOSE_IMG, screen_now, region)
@@ -1206,7 +1191,6 @@ def process_gold(screen_cv, region, last_gold_state, window):
             if rudnik_rel_y < 0.30 and not calendar_opened_coords:
                 logger.info(f"[GOLD] Открыто активное событие, переключаемся на вкладку рудника (rudnik.png conf={rudnik_conf:.3f}).")
                 pyautogui.click(rudnik_coords[0], rudnik_coords[1])
-                time.sleep(GOLD_ACTION_DELAY)
                 return GoldState.EVENTS_MENU_OPEN
 
         # Сначала проверим, не появилась ли иконка золотодобычи после предыдущего свайпа
@@ -1222,7 +1206,6 @@ def process_gold(screen_cv, region, last_gold_state, window):
             if calendar_coords:
                 logger.info("[GOLD] Нажимаем calendar.png чтобы открыть календарь событий.")
                 find_and_click(CALENDAR_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
-                time.sleep(GOLD_ACTION_DELAY)
                 return GoldState.EVENTS_MENU_OPEN
             # calendar.png не найден — пробуем свайпать
             logger.info("[GOLD] calendar.png не найден, пробуем свайпать для поиска.")
@@ -1276,7 +1259,6 @@ def process_gold(screen_cv, region, last_gold_state, window):
             find_and_click(CALENDAR_IMG, screen_cv, region)
         _gold_ctx.swipe_count = 0
         _gold_ctx.events_clicked_at = time.time()
-        time.sleep(GOLD_ACTION_DELAY)
         _gold_ctx.expected = 'events'
         return GoldState.EVENTS_MENU_OPEN
 
@@ -1287,13 +1269,11 @@ def process_gold(screen_cv, region, last_gold_state, window):
         if clicked_at and (time.time() - clicked_at) < 2.0:
             logger.info("[GOLD] Ожидаем завершения перехода после клика 'Перейти'.")
             _gold_ctx.moveon_clicked_at = None
-            time.sleep(GOLD_ACTION_DELAY)
             return GoldState.UNKNOWN
 
         clicked_events_at = _gold_ctx.events_clicked_at
         if clicked_events_at and (time.time() - clicked_events_at) < 3.0:
             logger.info("[GOLD] Ожидаем открытия календаря событий.")
-            time.sleep(GOLD_ACTION_DELAY)
             return GoldState.UNKNOWN
 
         # Если мы недавно открыли события, но оказались в активном событии — свайп по верхней карусели
@@ -1301,7 +1281,6 @@ def process_gold(screen_cv, region, last_gold_state, window):
                 and (time.time() - clicked_events_at) < 5.0:
             logger.info("[GOLD] Активное событие открылось вместо календаря. Пробуем свайп по верхней карусели.")
             swipe_horizontal(region, 'right')
-            time.sleep(GOLD_ACTION_DELAY)
             return GoldState.UNKNOWN
 
         _gold_ctx.stuck_count = _gold_ctx.stuck_count + 1
@@ -1320,7 +1299,6 @@ def process_gold(screen_cv, region, last_gold_state, window):
             _gold_ctx.stuck_last_action = None
             _gold_ctx.stuck_count = 0
 
-        time.sleep(GOLD_ACTION_DELAY)
         logger.info("[GOLD] UNKNOWN recovery end")
         return GoldState.UNKNOWN
 
