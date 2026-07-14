@@ -12,8 +12,10 @@ from utils import *
 from logger import logger  # Импортируем логгер
 from state import load_state, update_state, LAST_GOLD_TIME_KEY, STARTED_AT_KEY, RECALL_REQUESTED_KEY, FORCE_RECLAIM_KEY
 
-_GOLD_RAPID_POLL = 0.05
-_GOLD_RAPID_CHAIN_TIMEOUT = 10.0
+# _GOLD_RAPID_POLL = 0.05
+# _GOLD_RAPID_CHAIN_TIMEOUT = 10.0
+_GOLD_RAPID_POLL = 0.1
+_GOLD_RAPID_CHAIN_TIMEOUT = 4.0
 
 # ==========================================
 # МОДЕЛЬ СОСТОЯНИЯ ЗОЛОТА
@@ -70,8 +72,7 @@ _gold_ctx = GoldContext(
     force_reclaim=_saved_state.get(FORCE_RECLAIM_KEY, False),
 )
 
-_GOLD_RAPID_POLL = 0.2
-_GOLD_RAPID_CHAIN_TIMEOUT = 6.0
+
 
 # ==========================================
 # ТАЙМЕР / ПРОВЕРКА ПОРЫ
@@ -176,7 +177,7 @@ def _check_mining_result(screen_after, region):
     Возвращает:
         ('completed', None) — отряд отправлен (return.png / my_rudnik.png видны)
         ('go', None)       — открылось окно отправки отряда с кнопкой 'Марш'
-        ('summary', None)  — открылось окно 'Общая сила' с кнопкой 'Добывать' (место занято)
+        ('summary', None)  — открылось окно 'Общая сила' с кнопкой 'Добывать'
         ('wait', None)     — на экране ещё остаточный текст 'Общая сила', нужно подождать анимацию
         ('unknown', None)  — окно закрылось, состояние не определено
     """
@@ -199,6 +200,9 @@ def _check_mining_result(screen_after, region):
     # а после неё появляется 'Марш'. Поэтому WORK здесь означает промежуточный экран.
     # Если виден GO — переходим к нему. Если остался только summary text — ждём анимацию.
 
+    summary_coords, _ = find_on_screen(get_template(GOLD_WORK_IMG), screen_after, region, threshold=CONFIDENCE_THRESHOLD)
+    if summary_coords:
+        return 'summary', None
     # Если summary text остался, но ни go ни return/my_rudnik не видны — значит анимация ещё идёт
     summary_coords, _ = find_on_screen(get_template(GOLD_SUMMARY_STRENGTH_TEXT_IMG), screen_after, region, threshold=CONFIDENCE_THRESHOLD)
     if summary_coords:
@@ -393,7 +397,7 @@ def _rapid_capture_chain(initial_state, screen_cv, region, window):
 
             # Если одновременно видна кнопка Марш — сразу её
             go_coords, go_conf = find_on_screen(get_template(GOLD_GO_IMG), screen, region)
-            logger.info(f"[GOLD] SUMMARY/WORK: GO conf={go_conf:.3f} at {go_coords}")
+            # logger.info(f"[GOLD] SUMMARY/WORK: GO conf={go_conf:.3f} at {go_coords}")
             if go_coords:
                 result, screen = _click_and_check_completion(
                     GOLD_GO_IMG,
@@ -462,11 +466,11 @@ def _rapid_capture_chain(initial_state, screen_cv, region, window):
 
         # ---- FREE PLACE ----
         if current_state == GoldState.FREE_PLACE_VISIBLE:
-            if screen is None:
-                screen = _fresh_or_current(window, region, screen)
-                if screen is None:
-                    return GoldState.UNKNOWN
-                continue
+            # if screen is None:
+            #     screen = _fresh_or_current(window, region, screen)
+            #     if screen is None:
+            #         return GoldState.UNKNOWN
+            #     continue
             result, screen = _click_and_check_completion(
                 GOLD_FREE_PLACE_IMG,
                 "[GOLD] Нажимаем свободное место (быстрая цепочка).",
@@ -566,10 +570,10 @@ def _try_recall(screen_cv, region, window=None):
         return GoldState.RETURN_CONFIRM_VISIBLE
 
     # Если уже открыты детали рудника — кнопка отзыва внутри попапа
-    return_rudnik_coords, return_rudnik_conf = find_on_screen(get_template(GOLD_RETURN_RUDNIK_BUTTON_IMG), screen_cv, region)
+    return_rudnik_coords, return_rudnik_conf = find_on_screen(get_template(GOLD_CONFIRM_IMG), screen_cv, region)
     if return_rudnik_coords:
         logger.info(f"[GOLD] Отряд занят добычей. Отзываем через кнопку деталей рудника (conf={return_rudnik_conf:.3f}).")
-        find_and_click(GOLD_RETURN_RUDNIK_BUTTON_IMG, screen_cv, region)
+        find_and_click(GOLD_CONFIRM_IMG, screen_cv, region)
         return GoldState.RETURN_CONFIRM_VISIBLE
 
     # Fallback: открыть детали рудника через my_rudnik.png, если она в нижней части
@@ -940,13 +944,13 @@ def process_gold(screen_cv, region, last_gold_state, window):
     if current_state != last_gold_state:
         logger.info(f"[GOLD] Состояние: {current_state.value}")
         # Сохраняем скриншот только при критических переходах — не на каждую смену
-        critical_transitions = (
-            GoldState.RETURN_CONFIRM_VISIBLE, GoldState.FINISH_VISIBLE,
-            GoldState.FREE_PLACE_VISIBLE, GoldState.COMPLETED,
-            GoldState.FORWARD_POPUP_VISIBLE,
-        )
-        if current_state in critical_transitions or last_gold_state == GoldState.UNKNOWN:
-            save_debug_screenshot(screen_cv, f"gold_{current_state.value}")
+        # critical_transitions = (
+        #     GoldState.RETURN_CONFIRM_VISIBLE, GoldState.FINISH_VISIBLE,
+        #     GoldState.FREE_PLACE_VISIBLE, GoldState.COMPLETED,
+        #     GoldState.FORWARD_POPUP_VISIBLE,
+        # )
+        # if current_state in critical_transitions or last_gold_state == GoldState.UNKNOWN:
+        #     save_debug_screenshot(screen_cv, f"gold_{current_state.value}")
 
     # ---- RETURN BUTTON ----
     if current_state == GoldState.RETURN_BUTTON_VISIBLE:
@@ -1032,9 +1036,9 @@ def process_gold(screen_cv, region, last_gold_state, window):
 
     # ---- FREE PLACE ----
     if current_state == GoldState.FREE_PLACE_VISIBLE:
-        level_state = _ensure_target_level(screen_cv, region, window=window)
-        if level_state is not None:
-            return level_state
+        # level_state = _ensure_target_level(screen_cv, region, window=window)
+        # if level_state is not None:
+        #     return level_state
         return _rapid_capture_chain(current_state, screen_cv, region, window)
 
     # ---- MY RUDNIK / ACTIVE MINING ----
