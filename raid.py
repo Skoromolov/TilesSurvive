@@ -346,11 +346,11 @@ def process_raid(screen_cv, region, last_raid_state, last_join_time, raid_joined
         
         found, _ = find_and_click(RAID_PLUS_IMG, screen_cv, region)
         if found:
-            time.sleep(0.3)
+            time.sleep(RAID_WAIT_TIMEOUT)
             screen_cv = take_screenshot(window, region)
             found2, _ = find_and_click(RAID_MARCH_IMG, screen_cv, region)
             if found2:
-                time.sleep(0.3)
+                time.sleep(RAID_WAIT_TIMEOUT)
                 screen_cv = take_screenshot(window, region)
                 no_space_found, _ = find_and_click(RAID_NO_FREE_SPACE_IMG, screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
                 screen_cv = take_screenshot(window, region)
@@ -365,18 +365,18 @@ def process_raid(screen_cv, region, last_raid_state, last_join_time, raid_joined
                     return RaidState.RAID_IN_PROGRESS, time.time(), True
                 # If we clicked march but none of the expected outcomes happened,
                 # we might be in a transitional state - try again
-                if _raid_ctx['plus_attempts'] >= 3:
+                if _raid_ctx['plus_attempts'] >= 5:
                     _raid_ctx['plus_attempts'] = 0
-                    logger.warning("[RAID] Не удалось перейти из состояния PLUS_VISIBLE после 3 попыток. Сбрасываем.")
+                    logger.warning("[RAID] Не удалось перейти из состояния PLUS_VISIBLE после 5 попыток. Сбрасываем.")
                     find_and_click(CLOSE_IMG, screen_cv, region)
                     find_and_click(BACK_IMG, screen_cv, region)
                     return RaidState.NEEDS_SCROLL, time.time(), raid_joined_at_least_once
                 return RaidState.RAID_IN_PROGRESS, time.time(), True
             else:
                 # Could not click march button after clicking plus
-                if _raid_ctx['plus_attempts'] >= 3:
+                if _raid_ctx['plus_attempts'] >= 5:
                     _raid_ctx['plus_attempts'] = 0
-                    logger.warning("[RAID] Не удалось нажать кнопку Марш после 3 попыток. Сбрасываем.")
+                    logger.warning("[RAID] Не удалось нажать кнопку Марш после 5 попыток. Сбрасываем.")
                     find_and_click(CLOSE_IMG, screen_cv, region)
                     find_and_click(BACK_IMG, screen_cv, region)
                     return RaidState.NEEDS_SCROLL, time.time(), raid_joined_at_least_once
@@ -392,9 +392,11 @@ def process_raid(screen_cv, region, last_raid_state, last_join_time, raid_joined
 
     if current_state == RaidState.MARCH_VISIBLE:
         # screen_cv = take_screenshot(window, region)
-        find_and_click(RAID_MARCH_IMG, screen_cv, region)
+        find, _ = find_and_click(RAID_MARCH_IMG, screen_cv, region)
         # Защита от зацикливания: максимум 3 попытки клика по Марш
         _raid_ctx['march_attempts'] = _raid_ctx.get('march_attempts', 0) + 1
+        if find:
+            return RaidState.RAID_IN_PROGRESS
         if _raid_ctx['march_attempts'] > 3:
             logger.warning(f"[RAID] Марш не сработал после {_raid_ctx['march_attempts']-1} попыток. Закрываем попап и продолжаем поиск рейдов.")
             find_and_click(CLOSE_IMG, screen_cv, region)

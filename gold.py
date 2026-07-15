@@ -15,7 +15,7 @@ from state import load_state, update_state, LAST_GOLD_TIME_KEY, STARTED_AT_KEY, 
 # _GOLD_RAPID_POLL = 0.05
 # _GOLD_RAPID_CHAIN_TIMEOUT = 10.0
 _GOLD_RAPID_POLL = 0.1
-_GOLD_RAPID_CHAIN_TIMEOUT = 4.0
+_GOLD_RAPID_CHAIN_TIMEOUT = 7.0
 
 # ==========================================
 # МОДЕЛЬ СОСТОЯНИЯ ЗОЛОТА
