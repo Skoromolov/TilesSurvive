@@ -104,6 +104,7 @@ RAID_HAVE_TO_CONNECT_IMG = FOLDER + FOLDER_RAID + 'raid_connect.png'
 RAID_HAVE_TO_CONNECT_2_IMG = FOLDER + FOLDER_RAID + 'raid_connect_2.png'
 RAID_ATTACK_IMG = FOLDER + FOLDER_RAID + 'attack.png'
 RAID_FULL_IMG = FOLDER + FOLDER_RAID + 'raid_full.png'
+RAID_INFO_IMG = FOLDER + FOLDER_RAID + 'raid_info.png'
 
 # Элементы золотодобычи
 GOLD_RUDNIK_IMG = FOLDER + FOLDER_GOLD + 'rudnik.png'
@@ -225,6 +226,7 @@ class RaidState(Enum):
     NAVIGATION_NEEDED = "navigation_needed"
     NEEDS_SCROLL = "needs_scroll"
     RAID_FULL = "raid_full"
+    RAID_INFO_VISIBLE = "raid_info_visible"
 
 
 class GoldState(Enum):

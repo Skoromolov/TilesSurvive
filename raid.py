@@ -188,6 +188,11 @@ def determine_raid_state(screen_cv, region):
     Определить текущее состояние рейда.
     Возвращает: RaidState
     """
+    # Попали в детали рейда — сначала выходим, иначе не сможем присоединяться
+    coords, _ = find_on_screen(get_template(RAID_INFO_IMG), screen_cv, region, threshold=CONFIDENCE_THRESHOLD)
+    if coords:
+        return RaidState.RAID_INFO_VISIBLE
+
     coords, _ = find_on_screen(get_template(RECONNECT_IMG), screen_cv, region)
     if coords:
         return RaidState.RECONNECT_POPUP
@@ -263,6 +268,13 @@ def process_raid(screen_cv, region, last_raid_state, last_join_time, raid_joined
     # if current_state == RaidState.RECONNECT_REPEAT_POPUP:
     #     handle_reconnect_repeat(screen_cv, region)
     #     return None, last_join_time, raid_joined_at_least_once
+
+    if current_state == RaidState.RAID_INFO_VISIBLE:
+        logger.info("[RAID] Открыты детали рейда (raid_info). Нажимаем назад.")
+        clicked, _ = find_and_click(BACK_IMG, screen_cv, region)
+        if clicked:
+            time.sleep(0.5)
+        return RaidState.RAID_WINDOW_ACTIVE, last_join_time, raid_joined_at_least_once
 
     if current_state == RaidState.NAVIGATION_NEEDED:
         success = navigate_to_reid_window()
