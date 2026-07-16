@@ -185,9 +185,21 @@ def main():
 
                 # 3. Лечение если форсировано
                 if FORCE_HEAL_ONLY:
+                    if not HEAL_ENABLED:
+                        logger.info("[MAIN] FORCE_HEAL_ONLY=True, но HEAL_ENABLED=False — лечение отключено.")
+                        # Если нет никаких других включённых режимов — ждём на месте
+                        if not (RAID_ENABLED or GOLD_ENABLED or ADVENTURE_ENABLED):
+                            logger.warning("[MAIN] Все режимы отключены. Пауза 10 сек.")
+                            time.sleep(10)
+                            continue
                     logger.info("[MAIN] Переключение в принудительный режим HEAL")
                     current_mode = MainMode.HEAL
                     last_heal_state = None
+                    continue
+
+                # 3a. Принудительный HEAL_ONLY с отключённым HEAL_ENABLED — пропускаем, если активен только heal
+                if FORCE_HEAL_ONLY and not HEAL_ENABLED:
+                    # Должно было обработаться выше; fallback — ничего не делаем
                     continue
 
                 # 4. Проверяем рейды
@@ -229,9 +241,15 @@ def main():
                     else:
                         logger.debug("[MAIN] Активная золотодобыча: уже в поселении.")
 
-                # 7. Иначе — лечение как дефолтная активность, но сначала собираем книги/почту.
+                # 7. Книги/почта собираем всегда (независимо от HEAL_ENABLED)
                 if _collect_default_activities(screen_cv, region, window):
-                    # time.sleep(1)
+                    continue
+
+                # 8. Если лечение отключено — сразу возвращаемся в idle и ждём
+                if not HEAL_ENABLED:
+                    logger.debug("[MAIN] HEAL отключён, пропускаем режим HEAL.")
+                    # Нет иных активностей — короткая пауза, чтобы не крутить цикл впустую
+                    time.sleep(1)
                     continue
 
                 logger.debug("[MAIN] Переключение в режим HEAL (дефолт)")

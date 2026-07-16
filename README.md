@@ -73,24 +73,32 @@ pip install numpy opencv-python pyautogui pygetwindow pywin32 pynput
 В файле `config.py` настройте режим работы:
 
 ```python
-# Только лечение (игнорирует рейды, золото работает)
+# Включение/отключение отдельных режимов
+HEAL_ENABLED = True             # True = выполнять лечение; False = пропускать HEAL
+RAID_ENABLED = True             # True = участвовать в рейдах; False = отключить рейды
+GOLD_ENABLED = True             # True = автоматизация золотодобычи; False = отключить золото
+ADVENTURE_ENABLED = False       # True = автопереключение в режим приключений
+
+# Только лечение (игнорирует рейды; золото по таймеру работает, если GOLD_ENABLED)
 FORCE_HEAL_ONLY = True
 FORCE_RAID_ONLY = False
+FORCE_ADVENTURE_ONLY = False
 FAST_HEAL_FROM_MAP_ENABLED = False
 
 # Только рейды (игнорирует лечение)
+HEAL_ENABLED = True
 FORCE_HEAL_ONLY = False
 FORCE_RAID_ONLY = True
+FORCE_ADVENTURE_ONLY = False
 FAST_HEAL_FROM_MAP_ENABLED = False
 
 # Быстрое лечение с карты мира (высший приоритет)
-FORCE_HEAL_ONLY = False
-FORCE_RAID_ONLY = False
 FAST_HEAL_FROM_MAP_ENABLED = True
 
 # Автопереключение между лечением, рейдами и золотом (по умолчанию)
 FORCE_HEAL_ONLY = False
 FORCE_RAID_ONLY = False
+FORCE_ADVENTURE_ONLY = False
 FAST_HEAL_FROM_MAP_ENABLED = False
 ```
 
@@ -270,10 +278,14 @@ while (true) is (цикл)
   elseif (FORCE_RAID_ONLY?) then (да)
     :process_raid();
   elseif (FORCE_HEAL_ONLY?) then (да)
-    if (should_do_gold?) then (да)
-      :current_mode = GOLD;
+    if (HEAL_ENABLED?) then (да)
+      if (should_do_gold?) then (да)
+        :current_mode = GOLD;
+      else (нет)
+        :process_heal();
+      endif
     else (нет)
-      :process_heal();
+      :Ждём других режимов / idle;
     endif
   else (авто)
     if (current_mode == HEAL?) then (да)
@@ -282,7 +294,11 @@ while (true) is (цикл)
       elseif (raid button найдена?) then (да)
         :current_mode = RAID;
       else (нет)
-        :process_heal();
+        if (HEAL_ENABLED?) then (да)
+          :process_heal();
+        else (нет)
+          :idle / сбор ресурсов;
+        endif
       endif
     elseif (current_mode == GOLD?) then (да)
       :process_gold();

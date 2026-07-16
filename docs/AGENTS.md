@@ -60,22 +60,23 @@ pip install numpy opencv-python pyautogui pygetwindow pywin32 pynput
 - Gold module uses a context dict `_gold_ctx` for transient state; reset it with `reset_gold_context()` on every GOLD entry
 
 ## Mode switches
+- `HEAL_ENABLED` — enable/disable healing automation
 - `FORCE_HEAL_ONLY` — only healing and gold (by timer)
 - `FORCE_RAID_ONLY` — only raids
 - `FAST_HEAL_FROM_MAP_ENABLED` — highest priority, ambulance-based fast heal on world map, ignores raids
 - All false — auto-switch between HEAL, GOLD, RAID
+
+## Modifying behavior
+- Change mode switches in `config.py`: `HEAL_ENABLED`, `FORCE_HEAL_ONLY`, `FORCE_RAID_ONLY`, `FAST_HEAL_FROM_MAP_ENABLED`, `GOLD_ENABLED`
+- Adjust confidence thresholds in `config.py` if CV matching is unreliable
+- Change `GOLD_LEVEL`, `GOLD_INTERVAL`, `GOLD_MINING_DURATION` in `config.py` for gold behavior
+- Debug screenshots are saved automatically to `debug_screenshots/`
 
 ## Important docs that already exist
 - `docs/logic.md` — detailed state-machine logic for heal, raid, and gold modes
 - `docs/GOLD_MODULE.md` — detailed flow for the gold-mining module
 - `docs/REFACTORING_SUMMARY.md` — explains why `heal_and_raid.py` is legacy and how modules were split
 - `docs/GOLD_REFACTOR.md` — notes on the gold state-machine refactor
-
-## Modifying behavior
-- Change mode switches in `config.py`: `FORCE_HEAL_ONLY`, `FORCE_RAID_ONLY`, `FAST_HEAL_FROM_MAP_ENABLED`, `GOLD_ENABLED`
-- Adjust confidence thresholds in `config.py` if CV matching is unreliable
-- Change `GOLD_LEVEL`, `GOLD_INTERVAL`, `GOLD_MINING_DURATION` in `config.py` for gold behavior
-- Debug screenshots are saved automatically to `debug_screenshots/`
 
 ## What not to do
 - Do not delete `heal_and_raid.py` without checking `REFACTORING_SUMMARY.md` notes first

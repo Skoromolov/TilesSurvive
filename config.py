@@ -22,9 +22,11 @@ FOLDER_ADVENTURE = 'adventure/'
 FORCE_HEAL_ONLY = False   # True = только лечение, False = автопереключение
 FORCE_RAID_ONLY = False   # True = только рейды, False = автопереключение
 FORCE_ADVENTURE_ONLY = False   # True = только приключения, False = автопереключение
-ADVENTURE_ENABLED = True    # Включить автоматическое переключение в режим приключений
-GOLD_ENABLED = True           # True = включить автоматизацию золотодобычи
-RAID_ENABLED = True           # True = включать автоматическое участие в рейдах, False = отключить рейды
+
+ADVENTURE_ENABLED = False    # Включить автоматическое переключение в режим приключений
+GOLD_ENABLED = True          # True = включить автоматизацию золотодобычи
+RAID_ENABLED = True          # True = включать автоматическое участие в рейдах, False = отключить рейды
+HEAL_ENABLED = True          # True = включить автоматизацию лечения, False = пропускать HEAL
 
 # ==========================================
 # НАСТРОЙКИ БЫСТРОГО ЛЕЧЕНИЯ С КАРТЫ МИРА
